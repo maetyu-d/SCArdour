@@ -18,7 +18,7 @@ test -f gtk2_ardour/wscript || exit 1
 : ${SRCCACHE=/var/tmp/winsrc}  # source-code tgz cache
 : ${CURLOPT="-s -S --retry-connrefused --retry 3"}
 
-: ${HARRISONCHANNELSTRIP=harrison_channelstrip}
+: ${HARRISONCHANNELSTRIP=harrison_channelstrip${major_version}}
 : ${HARRISONLV2=harrison_lv2s-n}
 : ${HARRISONDSPURL=https://builder.harrisonconsoles.com/pub/dsp}
 

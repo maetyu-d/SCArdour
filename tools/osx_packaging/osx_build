@@ -28,11 +28,12 @@ WITH_NLS=1
 X42PLUGINS="x42-autotune x42-midifilter x42-stereoroute setBfree x42-avldrums x42-limiter x42-tuner"
 CURLOPT="-s -S --retry-connrefused --retry 3"
 
-: ${HARRISONCHANNELSTRIP=harrison_channelstrip}
+. ../define_versions.sh
+
+: ${HARRISONCHANNELSTRIP=harrison_channelstrip${major_version}}
 : ${HARRISONLV2=harrison_lv2s-n}
 : ${HARRISONDSPURL=https://builder.harrisonconsoles.com/pub/dsp}
 
-. ../define_versions.sh
 
 while [ $# -gt 0 ] ; do
 	echo "arg = $1"

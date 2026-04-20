@@ -37,7 +37,7 @@ NOSTRIP="libsuil|libserd|libsord|liblilv|libsratom|liblrdf|libardour|libpbd|libe
 X42PLUGINS="x42-autotune x42-midifilter x42-stereoroute setBfree x42-avldrums x42-limiter x42-tuner"
 CURLOPT="-s -S --retry-connrefused --retry 3"
 
-: ${HARRISONCHANNELSTRIP=harrison_channelstrip}
+: ${HARRISONCHANNELSTRIP=harrison_channelstrip${major_version}}
 : ${HARRISONLV2=harrison_lv2s-n}
 : ${HARRISONDSPURL=https://builder.harrisonconsoles.com/pub/dsp}
 
