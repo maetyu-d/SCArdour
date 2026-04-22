@@ -34,6 +34,7 @@
 #include "pbd/basename.h"
 #include "pbd/memento_command.h"
 #include "pbd/stateful_diff_command.h"
+#include "pbd/unwind.h"
 
 #include <ytkmm/stock.h>
 
@@ -5593,6 +5594,7 @@ SelectionDrag::motion (GdkEvent* event, bool first_move)
 
 	if (first_move) {
 		if (_editor.should_ripple_all ()) {
+			PBD::Unwinder<bool> uw (_editor._editor_track_selection_change_without_scroll, true);
 			editing_context.get_selection().set (_editor.get_track_views ());
 		}
 		_track_selection_at_start = editing_context.get_selection().tracks;
