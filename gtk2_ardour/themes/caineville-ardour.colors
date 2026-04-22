@@ -337,6 +337,8 @@
     <ColorAlias name="processor automation line" alias="theme:contrasting"/>
     <ColorAlias name="processor auxfeedback: fill" alias="theme:contrasting alt"/>
     <ColorAlias name="processor auxfeedback: led active" alias="alert:green"/>
+    <ColorAlias name="processor collapse button: fill" alias="widget:bg"/>
+    <ColorAlias name="processor collapse button: fill active" alias="neutral:background"/>
     <ColorAlias name="processor control button: fill" alias="neutral:background"/>
     <ColorAlias name="processor control button: fill active" alias="neutral:background2"/>
     <ColorAlias name="processor control button: led active" alias="widget:blue"/>

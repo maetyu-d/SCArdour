@@ -31,6 +31,8 @@
 #include "gtkmm2ext/gui_thread.h"
 #include "gtkmm2ext/utils.h"
 
+#include "widgets/tooltips.h"
+
 #include "ardour_ui.h"
 #include "mixer_ui.h"
 #include "plugin_selector.h"
@@ -78,7 +80,9 @@ ProcessorUIFrame::ProcessorUIFrame (std::shared_ptr<Route> r, std::shared_ptr<Pr
 {
 	_label.property_angle () = 90;
 	_collapse_btn.set_icon (ArdourIcon::HideEye);
+	_collapse_btn.set_name ("processor collapse button");
 	_collapse_btn.set_tweaks (ArdourButton::Square);
+	_enable_btn.set_tweaks (ArdourButton::ExpandtoSquare);
 
 	ui->set_no_show_all ();
 
@@ -90,7 +94,8 @@ ProcessorUIFrame::ProcessorUIFrame (std::shared_ptr<Route> r, std::shared_ptr<Pr
 	add (_top);
 	show_all ();
 
-	// set_tooltip (&_collapse_btn, _("Collapse"));
+	set_tooltip (&_collapse_btn, _("Collapse"));
+	set_tooltip (&_enable_btn, _("Bypass"));
 
 	_enable_btn.set_active (_proc->enabled ());
 	_collapse_btn.signal_clicked.connect ([&] () { _ui->set_visible (!_collapse_btn.get_active ()); save_state (); });
