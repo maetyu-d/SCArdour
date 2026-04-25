@@ -35,6 +35,7 @@
 #include "ardour/route.h"
 #include "ardour/send.h"
 #include "ardour/internal_send.h"
+#include "ardour/supercollider_track.h"
 
 #include "gtkmm2ext/utils.h"
 #include "gtkmm2ext/window_title.h"
@@ -51,6 +52,7 @@
 #include "return_ui.h"
 #include "route_params_ui.h"
 #include "send_ui.h"
+#include "supercollider_track_editor.h"
 #include "timers.h"
 
 #include "pbd/i18n.h"
@@ -59,6 +61,21 @@ using namespace ARDOUR;
 using namespace PBD;
 using namespace Gtk;
 using namespace Gtkmm2ext;
+
+static void
+open_supercollider_track_editor (std::shared_ptr<Route> route)
+{
+	std::shared_ptr<SuperColliderTrack> sct = std::dynamic_pointer_cast<SuperColliderTrack> (route);
+	if (!sct) {
+		return;
+	}
+
+	SuperColliderTrackEditor* editor = route->supercollider_editor ();
+	if (!editor) {
+		editor = new SuperColliderTrackEditor (route);
+	}
+	editor->open ();
+}
 
 RouteParams_UI::RouteParams_UI ()
 	: ArdourWindow (_("Tracks and Busses"))
@@ -416,6 +433,7 @@ RouteParams_UI::route_selected()
 		track_input_label.set_text (_route->name());
 
 		update_title();
+		open_supercollider_track_editor (_route);
 
 	} else {
 		// no selection

@@ -5,6 +5,8 @@
 #include "pbd/compose.h"
 #include "pbd/error.h"
 
+#include "ardour/playlist.h"
+#include "ardour/region.h"
 #include "ardour/session.h"
 #include "ardour/supercollider_session.h"
 
@@ -20,6 +22,7 @@ SuperColliderTrack::SuperColliderTrack (Session& sess, std::string name, TrackMo
 	, _runtime_start_pending (false)
 {
 	_session.SessionLoaded.connect_same_thread (*this, std::bind (&SuperColliderTrack::maybe_start_runtime_after_load, this));
+	PlaylistChanged.connect_same_thread (*this, std::bind (&SuperColliderTrack::attach_playlist_observers, this));
 }
 
 SuperColliderTrack::~SuperColliderTrack ()
@@ -34,6 +37,8 @@ SuperColliderTrack::init ()
 		return -1;
 	}
 
+	attach_playlist_observers ();
+	refresh_timeline_regions ();
 	refresh_runtime ();
 	return 0;
 }
@@ -57,6 +62,9 @@ SuperColliderTrack::set_state (const XMLNode& node, int version)
 		return -1;
 	}
 
+	attach_playlist_observers ();
+	refresh_timeline_regions ();
+
 	if (_session.loading ()) {
 		_runtime_start_pending = _supercollider_auto_boot;
 	} else {
@@ -77,6 +85,7 @@ void
 SuperColliderTrack::set_supercollider_synthdef (std::string const& synthdef)
 {
 	_supercollider_synthdef = synthdef.empty () ? default_supercollider_synthdef () : synthdef;
+	refresh_timeline_regions ();
 	refresh_runtime ();
 }
 
@@ -201,4 +210,46 @@ SuperColliderTrack::refresh_runtime ()
 		_supercollider_runtime_last_error.clear ();
 		stop_supercollider_runtime ();
 	}
+}
+
+void
+SuperColliderTrack::attach_playlist_observers ()
+{
+	_playlist_connection.disconnect ();
+
+	std::shared_ptr<Playlist> const pl = playlist ();
+	if (!pl) {
+		return;
+	}
+
+	pl->ContentsChanged.connect_same_thread (
+		_playlist_connection,
+		std::bind (&SuperColliderTrack::playlist_contents_changed, this)
+	);
+}
+
+void
+SuperColliderTrack::refresh_timeline_regions ()
+{
+	std::shared_ptr<Playlist> const pl = playlist ();
+	if (!pl) {
+		return;
+	}
+
+	std::string const clip_name = string_compose (_("SC: %1"), _supercollider_synthdef.empty () ? default_supercollider_synthdef () : _supercollider_synthdef);
+	pl->foreach_region ([clip_name] (std::shared_ptr<Region> region) {
+		if (!region) {
+			return;
+		}
+
+		if (region->name () != clip_name) {
+			region->set_name (clip_name);
+		}
+	});
+}
+
+void
+SuperColliderTrack::playlist_contents_changed ()
+{
+	refresh_timeline_regions ();
 }

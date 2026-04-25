@@ -183,6 +183,7 @@
 #include "session_option_editor.h"
 #include "speaker_dialog.h"
 #include "splash.h"
+#include "supercollider_track_editor.h"
 #include "template_dialog.h"
 #include "time_axis_view_item.h"
 #include "timers.h"
@@ -2920,6 +2921,12 @@ ARDOUR_UI::add_route_dialog_response (int r)
 
 		if (tracks.size() != count) {
 			error << string_compose(P_("could not create %1 new SuperCollider track", "could not create %1 new SuperCollider tracks", count), count) << endmsg;
+		} else if (!tracks.empty ()) {
+			SuperColliderTrackEditor* editor = tracks.front ()->supercollider_editor ();
+			if (!editor) {
+				editor = new SuperColliderTrackEditor (tracks.front ());
+			}
+			editor->open ();
 		}
 		break;
 	}

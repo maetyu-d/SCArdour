@@ -54,6 +54,8 @@ public:
 
 	void set_session (ARDOUR::Session*);
 	void set_route (std::shared_ptr<ARDOUR::Route>, bool force = false);
+	void set_force_hide_insert (bool);
+	void focus_supercollider_source ();
 
 private:
 	void property_changed (const PBD::PropertyChange& what_changed);
@@ -97,6 +99,7 @@ private:
 
 	ArdourWidgets::Frame _insert_frame;
 	bool                 _show_insert;
+	bool                 _force_hide_insert;
 	bool                 _updating_supercollider_ui;
 	bool                 _supercollider_dirty;
 

@@ -58,6 +58,7 @@
 #include "ardour/profile.h"
 #include "ardour/route.h"
 #include "ardour/route_group.h"
+#include "ardour/supercollider_track.h"
 #include "ardour/send.h"
 #include "ardour/selection.h"
 #include "ardour/session.h"
@@ -1095,6 +1096,10 @@ MixerStrip::build_route_ops_menu ()
 		items.push_back (MenuElem (_("Color..."), sigc::bind (sigc::mem_fun (*this, &RouteUI::choose_color), top)));
 
 		items.push_back (MenuElem (_("Comments..."), sigc::mem_fun (*this, &RouteUI::open_comment_editor)));
+
+		if (std::dynamic_pointer_cast<ARDOUR::SuperColliderTrack> (_route)) {
+			items.push_back (MenuElem (_("Open SuperCollider Editor..."), sigc::mem_fun (*this, &RouteUI::open_supercollider_editor)));
+		}
 
 		items.push_back (MenuElem (_("Inputs..."), sigc::mem_fun (*this, &RouteUI::edit_input_configuration)));
 
@@ -2186,4 +2191,3 @@ MixerStrip::hide_master_spacer (bool yn)
 		spacer.hide();
 	}
 }
-

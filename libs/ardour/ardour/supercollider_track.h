@@ -2,9 +2,13 @@
 
 #include <string>
 
+#include "pbd/signals.h"
+
 #include "ardour/midi_track.h"
 
 namespace ARDOUR {
+
+class Region;
 
 class LIBARDOUR_API SuperColliderTrack : public MidiTrack
 {
@@ -43,12 +47,16 @@ private:
 
 	void maybe_start_runtime_after_load ();
 	void refresh_runtime ();
+	void attach_playlist_observers ();
+	void refresh_timeline_regions ();
+	void playlist_contents_changed ();
 
 	std::string _supercollider_source;
 	std::string _supercollider_synthdef;
 	bool _supercollider_auto_boot;
 	std::string _supercollider_runtime_last_error;
 	bool _runtime_start_pending;
+	PBD::ScopedConnection _playlist_connection;
 };
 
 } // namespace ARDOUR

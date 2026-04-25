@@ -276,6 +276,7 @@ gtk2_ardour_sources = [
         'route_list_base.cc',
         'route_params_ui.cc',
         'route_properties_box.cc',
+        'supercollider_track_editor.cc',
         'route_processor_selection.cc',
         'route_time_axis.cc',
         'route_ui.cc',

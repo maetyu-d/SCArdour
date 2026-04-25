@@ -48,6 +48,7 @@
 #include "route_comment_editor.h"
 #include "selectable.h"
 #include "stripable_colorpicker.h"
+#include "supercollider_track_editor.h"
 #include "window_manager.h"
 
 namespace ARDOUR {
@@ -158,6 +159,8 @@ public:
 	void update_monitoring_display ();
 	void open_comment_editor ();
 	void toggle_comment_editor ();
+	void open_supercollider_editor ();
+	void toggle_supercollider_editor ();
 	void set_route_active (bool, bool);
 	void set_disk_io_point (ARDOUR::DiskIOPoint);
 	void fan_out (bool to_busses = true, bool group = true);

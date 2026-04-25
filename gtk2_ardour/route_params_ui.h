@@ -43,7 +43,6 @@
 #include "ardour_window.h"
 #include "processor_box.h"
 #include "processor_selection.h"
-
 namespace ARDOUR {
 	class Route;
 	class Send;
@@ -174,5 +173,3 @@ private:
 	void update_title ();
 	//void unselect_all_redirects ();
 };
-
-

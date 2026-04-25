@@ -133,6 +133,7 @@ RoutePropertiesBox::RoutePropertiesBox ()
 	, _supercollider_apply_button (_("Apply"))
 	, _supercollider_restart_button (_("Restart"))
 	, _show_insert (false)
+	, _force_hide_insert (false)
 	, _updating_supercollider_ui (false)
 	, _supercollider_dirty (false)
 	, _idle_refill_processors_id (-1)
@@ -156,6 +157,9 @@ RoutePropertiesBox::RoutePropertiesBox ()
 	_supercollider_synthdef_label.set_alignment (0.0, 0.5);
 	_supercollider_source_buffer = Gtk::TextBuffer::create ();
 	_supercollider_source_view.set_buffer (_supercollider_source_buffer);
+	_supercollider_source_view.set_editable (true);
+	_supercollider_source_view.set_cursor_visible (true);
+	_supercollider_source_view.set_can_focus (true);
 	_supercollider_source_view.set_wrap_mode (Gtk::WRAP_WORD_CHAR);
 	_supercollider_source_view.set_size_request (420, 180);
 	_supercollider_source_scroller.set_policy (Gtk::POLICY_AUTOMATIC, Gtk::POLICY_AUTOMATIC);
@@ -291,20 +295,33 @@ void
 RoutePropertiesBox::update_processor_box_visibility ()
 {
 	_show_insert = !ActionManager::get_toggle_action (X_("Editor"), X_("show-editor-mixer"))->get_active ();
-	if (!_show_insert || _proc_uis.empty ()) {
+	if (_force_hide_insert || !_show_insert || _proc_uis.empty ()) {
 		_insert_frame.hide ();
 	} else {
 		_insert_frame.show ();
 	}
 
 #ifndef MIXBUS
-	if (_show_insert || !_proc_uis.empty ()) {
+	if (!_force_hide_insert && (_show_insert || !_proc_uis.empty ())) {
 		float ui_scale = std::max<float> (1.f, UIConfiguration::instance().get_ui_scale());
 		set_size_request (-1, 365 * ui_scale); // match with SelectionPropertiesBox
 	} else {
 		set_size_request (-1, -1);
 	}
 #endif
+}
+
+void
+RoutePropertiesBox::set_force_hide_insert (bool yn)
+{
+	_force_hide_insert = yn;
+	update_processor_box_visibility ();
+}
+
+void
+RoutePropertiesBox::focus_supercollider_source ()
+{
+	_supercollider_source_view.grab_focus ();
 }
 
 void

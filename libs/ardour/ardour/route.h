@@ -69,6 +69,7 @@
 class RoutePinWindowProxy;
 class PatchChangeGridDialog;
 class RouteCommentEditor;
+class SuperColliderTrackEditor;
 
 namespace ARDOUR {
 
@@ -146,6 +147,8 @@ public:
 
 	RouteCommentEditor* comment_editor () const { return _comment_editor_window; }
 	void set_comment_editor (RouteCommentEditor* w) { _comment_editor_window = w; }
+	SuperColliderTrackEditor* supercollider_editor () const { return _supercollider_editor_window; }
+	void set_supercollider_editor (SuperColliderTrackEditor* w) { _supercollider_editor_window = w; }
 
 	bool set_name (const std::string& str);
 	static void set_name_in_state (XMLNode &, const std::string &);
@@ -675,6 +678,7 @@ protected:
 
 	std::string          _comment;
 	RouteCommentEditor*  _comment_editor_window;
+	SuperColliderTrackEditor* _supercollider_editor_window;
 
 	bool           _have_internal_generator;
 	DataType       _default_type;
@@ -822,4 +826,3 @@ private:
 };
 
 } // namespace ARDOUR
-

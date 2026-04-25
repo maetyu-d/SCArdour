@@ -53,6 +53,7 @@
 #include "ardour/phase_control.h"
 #include "ardour/send.h"
 #include "ardour/route.h"
+#include "ardour/supercollider_track.h"
 #include "ardour/selection.h"
 #include "ardour/session.h"
 #include "ardour/session_playlists.h"
@@ -1844,6 +1845,42 @@ RouteUI::open_comment_editor ()
 		rce = new RouteCommentEditor (_route);
 	}
 	rce->open ();
+}
+
+void
+RouteUI::toggle_supercollider_editor ()
+{
+	if (!_route) {
+		return;
+	}
+
+	if (!std::dynamic_pointer_cast<ARDOUR::SuperColliderTrack> (_route)) {
+		return;
+	}
+
+	SuperColliderTrackEditor* sce = _route->supercollider_editor ();
+	if (!sce) {
+		sce = new SuperColliderTrackEditor (_route);
+	}
+	sce->toggle ();
+}
+
+void
+RouteUI::open_supercollider_editor ()
+{
+	if (!_route) {
+		return;
+	}
+
+	if (!std::dynamic_pointer_cast<ARDOUR::SuperColliderTrack> (_route)) {
+		return;
+	}
+
+	SuperColliderTrackEditor* sce = _route->supercollider_editor ();
+	if (!sce) {
+		sce = new SuperColliderTrackEditor (_route);
+	}
+	sce->open ();
 }
 
 void
