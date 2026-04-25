@@ -112,6 +112,7 @@
 #include "ardour/midi_scene_changer.h"
 #include "ardour/midi_source.h"
 #include "ardour/midi_track.h"
+#include "ardour/supercollider_track.h"
 #include "ardour/mixer_scene.h"
 #include "ardour/playlist_factory.h"
 #include "ardour/playlist_source.h"
@@ -2557,6 +2558,8 @@ Session::XMLRouteFactory (const XMLNode& node, int version)
 
 		if (type == DataType::AUDIO) {
 			track.reset (new AudioTrack (*this));
+		} else if (SuperColliderTrack::xml_node_is_supercollider (node)) {
+			track.reset (new SuperColliderTrack (*this));
 		} else {
 			track.reset (new MidiTrack (*this));
 		}
@@ -2607,6 +2610,8 @@ Session::XMLRouteFactory_3X (const XMLNode& node, int version)
 
 		if (type == DataType::AUDIO) {
 			track.reset (new AudioTrack (*this));
+		} else if (SuperColliderTrack::xml_node_is_supercollider (node)) {
+			track.reset (new SuperColliderTrack (*this));
 		} else {
 			track.reset (new MidiTrack (*this));
 		}
@@ -2669,6 +2674,8 @@ Session::XMLRouteFactory_2X (const XMLNode& node, int version)
 
 		if (type == DataType::AUDIO) {
 			track.reset (new AudioTrack (*this));
+		} else if (SuperColliderTrack::xml_node_is_supercollider (node)) {
+			track.reset (new SuperColliderTrack (*this));
 		} else {
 			track.reset (new MidiTrack (*this));
 		}

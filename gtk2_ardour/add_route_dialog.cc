@@ -125,6 +125,19 @@ AddRouteDialog::AddRouteDialog ()
 		     "\n" + _("The track(s) will be added at the location specified by \"Position\"")
 		     );
 
+		builtin_types.emplace_back(_("SuperCollider Tracks"), std::string () +
+		     _("Use these settings to create one or more SuperCollider-backed instrument tracks on macOS.") + "\n\n" +
+		     _("Ardour will look for the SuperColliderAU Audio Unit and insert it automatically.") + "\n\n" +
+		     _("You may select:") + "\n" +
+		     "* " + _("The number of tracks to add") + "\n" +
+		     "* " + _("A name for the track(s)") + "\n" +
+		     "* " + _("A group which the track(s) will be assigned to") + "\n" +
+#ifndef MIXBUS
+		     "* " + _("The pin connections mode (see tooltip for details)") + "\n" +
+#endif
+		     "\n" + _("If SuperColliderAU is not installed or scanned yet, track creation will stop with a warning.")
+		     );
+
 		builtin_types.emplace_back(_("Audio Busses"), std::string () +
 		     _("Use these settings to create one or more audio busses.") + "\n\n" +
 		     _("You may select:") + "\n" +
@@ -588,6 +601,8 @@ AddRouteDialog::type_wanted()
 		return MidiBus;
 	} else if (str == _("MIDI Tracks")) {
 		return MidiTrack;
+	} else if (str == _("SuperCollider Tracks")) {
+		return SuperColliderTrack;
 	} else if (str == _("Audio Tracks")) {
 		return AudioTrack;
 	} else if (str == _("VCA Masters")) {
@@ -608,6 +623,8 @@ AddRouteDialog::type_wanted_to_localized_string (AddRouteDialog::TypeWanted type
 			return _("MIDI Busses");
 		case MidiTrack:
 			return _("MIDI Tracks");
+		case SuperColliderTrack:
+			return _("SuperCollider Tracks");
 		case AudioTrack:
 			return _("Audio Tracks");
 		case VCAMaster:
@@ -634,6 +651,9 @@ AddRouteDialog::maybe_update_name_template_entry ()
 	case MidiTrack:
 		/* set name of instrument or _("MIDI") */
 		instrument_changed ();
+		break;
+	case SuperColliderTrack:
+		name_template_entry.set_text (_("SuperCollider"));
 		break;
 	case AudioBus:
 	case MidiBus:
@@ -687,6 +707,29 @@ AddRouteDialog::track_type_chosen ()
 
 		instrument_label.set_sensitive (true);
 		instrument_combo.set_sensitive (true);
+
+		group_label.set_sensitive (true);
+		route_group_combo.set_sensitive (true);
+
+		strict_io_label.set_sensitive (true);
+		strict_io_combo.set_sensitive (true);
+
+		show_on_cue_chkbox.set_sensitive (true);
+
+		insert_label.set_sensitive (true);
+		insert_at_combo.set_sensitive (true);
+
+		break;
+	case SuperColliderTrack:
+
+		configuration_label.set_sensitive (false);
+		channel_combo.set_sensitive (false);
+
+		mode_label.set_sensitive (false);
+		mode_combo.set_sensitive (false);
+
+		instrument_label.set_sensitive (false);
+		instrument_combo.set_sensitive (false);
 
 		group_label.set_sensitive (true);
 		route_group_combo.set_sensitive (true);
@@ -881,6 +924,7 @@ AddRouteDialog::channels ()
 
 	case MidiBus:
 	case MidiTrack:
+	case SuperColliderTrack:
 		ret.set (DataType::AUDIO, 0);
 		ret.set (DataType::MIDI, 1);
 		break;

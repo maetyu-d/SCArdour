@@ -253,6 +253,8 @@ libardour_sources = [
         'speakers.cc',
         'srcfilesource.cc',
         'stripable.cc',
+        'supercollider_session.cc',
+        'supercollider_track.cc',
         # 'step_sequencer.cc',
         'strip_silence.cc',
         'strum.cc',

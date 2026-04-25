@@ -69,6 +69,7 @@ public:
 	enum TypeWanted {
 		AudioTrack,
 		MidiTrack,
+		SuperColliderTrack,
 		AudioBus,
 		MidiBus,
 		VCAMaster,
@@ -179,4 +180,3 @@ private:
 	void name_template_entry_insertion (Glib::ustring const&, int*);
 	void name_template_entry_deletion (int, int);
 };
-

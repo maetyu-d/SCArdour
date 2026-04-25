@@ -102,6 +102,9 @@ while [ $# -gt 0 ] ; do
 	esac
 done
 
+BUILD_ROOT_REAL=$(cd "$BUILD_ROOT" && pwd -P)
+GTKSTACK_ROOT_REAL=$(cd "$GTKSTACK_ROOT" && pwd -P)
+
 if test -z "$PRODUCT_PKG_DIR" -o -z "$APPNAME"; then
 	echo "application or product-name was not specified"
 	exit 1
@@ -503,6 +506,9 @@ fi
 echo "Stripping symbols and architectures."
 while [ true ] ; do
 	missing=false
+	old_ifs="$IFS"
+	IFS='
+'
 	for file in $APPROOT/MacOS/* $Frameworks/* $Panners/*.dylib $Backends/*.dylib $Surfaces/*.dylib $GTK_ENGINE_DIR/*.dylib ; do
 		if ! file $file | grep -qs Mach-O ; then
 			continue
@@ -522,21 +528,29 @@ while [ true ] ; do
 			fi
 		fi
 
-		deps=`otool -L $file | awk '{print $1}' | egrep "($GTKSTACK_ROOT|/opt/|/local/|libs/$STDCPP)" | grep -v 'libjack\.' | grep -v "$(basename $file)"`
+		deps=`otool -L "$file" | sed -E '1d;s/^[[:space:]]*//;s/ \\(compatibility.*$//' | egrep "($GTKSTACK_ROOT_REAL|$BUILD_ROOT_REAL|/opt/|/local/|libs/$STDCPP|@rpath/)" | grep -v 'libjack\.' | grep -v "$(basename "$file")"`
 		# echo -n "."
 		for dep in $deps ; do
-			base=`basename $dep`
-			if ! test -f $Frameworks/$base; then
-				if echo $dep | grep -sq '^libs' ; then
-					cp $BUILD_ROOT/$dep $Frameworks
+			base=`basename "$dep"`
+			resolved_dep="$dep"
+			if echo "$dep" | grep -sq '^@rpath/' ; then
+				resolved_dep="$GTKSTACK_ROOT/lib/$base"
+			elif echo "$dep" | grep -sq '^libs' ; then
+				resolved_dep="$BUILD_ROOT/$dep"
+			fi
+			if ! test -f "$Frameworks/$base"; then
+				if test -f "$resolved_dep" ; then
+					cp "$resolved_dep" "$Frameworks"
 				else
-					cp $dep $Frameworks
+					echo "Missing dependency $dep (looked for $resolved_dep)"
+					exit 1
 				fi
 				missing=true
-				chmod 755 $Frameworks/$base
+				chmod 755 "$Frameworks/$base"
 			fi
 		done
 	done
+	IFS="$old_ifs"
 	if test x$missing = xfalse ; then
 		# everything has been found
 		break
@@ -609,14 +623,15 @@ fi
 for exe in $executables; do
 	echo "Processing Executable: $exe"
 	EXE=$APPROOT/MacOS/$exe
-	changes=""
-	for lib in `otool -L $EXE | egrep "($GTKSTACK_ROOT|/opt/|/local/|libs/$STDCPP)" | awk '{print $1}' | grep -v 'libjack\.'` ; do
-		base=`basename $lib`
-		changes="$changes -change $lib @executable_path/../lib/$base"
+	install_name_tool -add_rpath "@executable_path/../lib" "$EXE" 2>/dev/null || true
+	old_ifs="$IFS"
+	IFS='
+'
+	for lib in `otool -L "$EXE" | sed -E '1d;s/^[[:space:]]*//;s/ \\(compatibility.*$//' | egrep "($GTKSTACK_ROOT_REAL|$BUILD_ROOT_REAL|/opt/|/local/|libs/$STDCPP)" | grep -v 'libjack\.'` ; do
+		base=`basename "$lib"`
+		install_name_tool -change "$lib" "@executable_path/../lib/$base" "$EXE"
 	done
-	if test "x$changes" != "x" ; then
-		install_name_tool $changes $EXE
-	fi
+	IFS="$old_ifs"
 done
 
 echo "Fixing up library names ..."
@@ -638,26 +653,26 @@ for libdir in $Frameworks $Surfaces $Panners $Backends $Frameworks/LV2/* $GTK_EN
 
 		# change all the dependencies
 
-		changes=""
-		for lib in `otool -L $dylib | egrep "($GTKSTACK_ROOT|/opt/|/local/|libs/$STDCPP)" | awk '{print $1}' | grep -v 'libjack\.'` ; do
-			base=`basename $lib`
-			if test -f $Frameworks/$base ; then
-				changes="$changes -change $lib @executable_path/../lib/$base"
+		install_name_tool -add_rpath "@executable_path/../lib" "$dylib" 2>/dev/null || true
+		old_ifs="$IFS"
+		IFS='
+'
+		for lib in `otool -L "$dylib" | sed -E '1d;s/^[[:space:]]*//;s/ \\(compatibility.*$//' | egrep "($GTKSTACK_ROOT_REAL|$BUILD_ROOT_REAL|/opt/|/local/|libs/$STDCPP)" | grep -v 'libjack\.'` ; do
+			base=`basename "$lib"`
+			if test -f "$Frameworks/$base" ; then
+				if install_name_tool -change "$lib" "@executable_path/../lib/$base" "$dylib" ; then
+					:
+				else
+					exit 1
+				fi
 			fi
 		done
-
-		if test "x$changes" != x ; then
-			if  install_name_tool $changes $dylib ; then
-				:
-			else
-				exit 1
-			fi
-		fi
+		IFS="$old_ifs"
 
 		# now the change what the library thinks its own name is
 
-		base=`basename $dylib`
-		install_name_tool -id @executable_path/../lib$libbase/$base $dylib
+		base=`basename "$dylib"`
+		install_name_tool -id "@executable_path/../lib$libbase/$base" "$dylib"
 	done
 done
 
@@ -991,6 +1006,11 @@ if test -n "${APPLE_DEVELOPER_ID_FOR_APPLICATION}"; then
 
 		rm $ZIP_PATH
 	fi
+else
+	echo "No Developer ID found, applying ad-hoc signature to the main app"
+	find ${PRODUCT_PKG_DIR}/${APPROOT}/lib -type f -print0 | xargs -0 -I {} -P 7 codesign --force --sign - "{}"
+	find ${PRODUCT_PKG_DIR}/${APPROOT}/MacOS -type f -print0 | xargs -0 -I {} -P 7 codesign --force --sign - "{}"
+	codesign --force --sign - ${PRODUCT_PKG_DIR}/${APPDIR}
 fi
 
 if test -n "${APPLE_DEVELOPER_ID_FOR_APPLICATION}" -a -n "$WITH_XJADEO"; then
@@ -1029,6 +1049,11 @@ if test -n "${APPLE_DEVELOPER_ID_FOR_APPLICATION}" -a -n "$WITH_XJADEO"; then
 
 		rm $ZIP_PATH
 	fi
+elif test -n "$WITH_XJADEO"; then
+	echo "No Developer ID found, applying ad-hoc signature to Jadeo"
+	find ${PRODUCT_PKG_DIR}/Jadeo.app/Contents/Frameworks -type f -print0 | xargs -0 -I {} -P 7 codesign --force --sign - "{}"
+	find ${PRODUCT_PKG_DIR}/Jadeo.app/Contents/MacOS -type f -print0 | xargs -0 -I {} -P 7 codesign --force --sign - "{}"
+	codesign --force --sign - ${PRODUCT_PKG_DIR}/Jadeo.app
 fi
 
 ################################################################################

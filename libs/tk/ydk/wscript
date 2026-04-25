@@ -184,6 +184,7 @@ def build(bld):
     if sys.platform == 'darwin':
         obj.source   = libydk_sources + libydk_quartz_sources
         obj.cflags   += ['-xobjective-c']
+        obj.defines  += ['DISABLE_VISIBILITY']
         obj.uselib   += ' OSX' # -framework Cocoa -framework CoreFoundation -framework ApplicationServices
         obj.includes += ['quartz', 'quartz/ydk', 'ydk/quartz']
         obj.export_includes += ['quartz']
@@ -202,4 +203,3 @@ def build(bld):
         obj.uselib   += ' GIO-UNIX X11 XEXT XINERAMA RANDR DL'
         obj.includes        += ['x11', 'x11/ydk', 'ydk/x11']
         obj.export_includes += ['x11']
-

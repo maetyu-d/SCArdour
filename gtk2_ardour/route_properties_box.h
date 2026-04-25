@@ -23,7 +23,13 @@
 #include <vector>
 
 #include <ytkmm/box.h>
+#include <ytkmm/button.h>
+#include <ytkmm/checkbutton.h>
+#include <ytkmm/entry.h>
+#include <ytkmm/label.h>
 #include <ytkmm/scrolledwindow.h>
+#include <ytkmm/textbuffer.h>
+#include <ytkmm/textview.h>
 
 #include "ardour/ardour.h"
 #include "ardour/session_handle.h"
@@ -34,6 +40,7 @@ namespace ARDOUR {
 	class Route;
 	class Processor;
 	class Session;
+	class SuperColliderTrack;
 }
 
 class GenericPluginUI;
@@ -60,18 +67,38 @@ private:
 	void add_processor_to_display (std::weak_ptr<ARDOUR::Processor> w);
 	void idle_refill_processors ();
 	void surround_master_added_or_removed ();
+	void sync_supercollider_editor ();
+	void mark_supercollider_editor_dirty ();
+	void apply_supercollider_changes ();
+	void restart_supercollider_runtime ();
 
 	static int _idle_refill_processors (gpointer);
 
 	Gtk::ScrolledWindow _scroller;
 	Gtk::HBox           _box;
+	Gtk::VBox           _left_box;
 
 	std::shared_ptr<ARDOUR::Route> _route;
 	std::vector <GenericPluginUI*> _proc_uis;
 
+	ProcessorBox*             _insert_box;
+	ArdourWidgets::Frame      _supercollider_frame;
+	Gtk::VBox                 _supercollider_box;
+	Gtk::HBox                 _supercollider_controls;
+	Gtk::Label                _supercollider_status;
+	Gtk::Label                _supercollider_synthdef_label;
+	Gtk::Entry                _supercollider_synthdef_entry;
+	Gtk::CheckButton          _supercollider_auto_boot_button;
+	Gtk::Button               _supercollider_apply_button;
+	Gtk::Button               _supercollider_restart_button;
+	Gtk::ScrolledWindow       _supercollider_source_scroller;
+	Gtk::TextView             _supercollider_source_view;
+	Glib::RefPtr<Gtk::TextBuffer> _supercollider_source_buffer;
+
 	ArdourWidgets::Frame _insert_frame;
-	ProcessorBox*        _insert_box;
 	bool                 _show_insert;
+	bool                 _updating_supercollider_ui;
+	bool                 _supercollider_dirty;
 
 	int _idle_refill_processors_id;
 
@@ -79,4 +106,3 @@ private:
 	PBD::ScopedConnectionList _route_connections;
 	PBD::ScopedConnectionList _forever_connections;
 };
-

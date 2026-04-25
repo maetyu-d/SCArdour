@@ -161,6 +161,8 @@ class MidiPort;
 class MidiRegion;
 class MidiSource;
 class MidiTrack;
+class SuperColliderSessionRuntime;
+class SuperColliderTrack;
 class MixerScene;
 class Playlist;
 class PluginInsert;
@@ -811,6 +813,20 @@ public:
 		bool input_auto_connect,
 		bool trigger_visibility = false
 		);
+
+	std::list<std::shared_ptr<SuperColliderTrack> > new_supercollider_track (
+		const ChanCount& input, const ChanCount& output, bool strict_io,
+		std::shared_ptr<PluginInfo> instrument,
+		Plugin::PresetRecord* pset,
+		std::shared_ptr<RouteGroup> route_group, uint32_t how_many, std::string name_template,
+		PresentationInfo::order_t,
+		TrackMode mode,
+		bool input_auto_connect,
+		bool trigger_visibility = false
+		);
+
+	SuperColliderSessionRuntime& supercollider_runtime ();
+	SuperColliderSessionRuntime const& supercollider_runtime () const;
 
 	RouteList new_audio_route (int input_channels, int output_channels, std::shared_ptr<RouteGroup> route_group, uint32_t how_many, std::string name_template, PresentationInfo::Flag, PresentationInfo::order_t);
 	RouteList new_midi_route (std::shared_ptr<RouteGroup> route_group, uint32_t how_many, std::string name_template, bool strict_io, std::shared_ptr<PluginInfo> instrument, Plugin::PresetRecord*, PresentationInfo::Flag, PresentationInfo::order_t);
@@ -1629,6 +1645,7 @@ private:
 	samplepos_t              last_loopend;
 
 	const std::unique_ptr<SessionDirectory> _session_dir;
+	std::unique_ptr<SuperColliderSessionRuntime> _supercollider_runtime;
 
 	void hookup_io ();
 	void graph_reordered (bool called_from_backend);
@@ -2451,4 +2468,3 @@ private:
 
 
 } // namespace ARDOUR
-

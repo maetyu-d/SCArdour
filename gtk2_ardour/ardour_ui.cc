@@ -101,6 +101,7 @@
 #include "ardour/session_directory.h"
 #include "ardour/session_route.h"
 #include "ardour/source_factory.h"
+#include "ardour/supercollider_track.h"
 #include "ardour/transport_master.h"
 #include "ardour/transport_master_manager.h"
 #include "ardour/triggerbox.h"
@@ -2910,6 +2911,18 @@ ARDOUR_UI::add_route_dialog_response (int r)
 	case AddRouteDialog::MidiTrack:
 		session_add_midi_route (true, route_group, count, name_template, strict_io, instrument, 0, order, trigger_visibility);
 		break;
+	case AddRouteDialog::SuperColliderTrack:
+	{
+		ChanCount one_midi_channel;
+		one_midi_channel.set (DataType::MIDI, 1);
+		std::list<std::shared_ptr<SuperColliderTrack> > tracks;
+		tracks = _session->new_supercollider_track (one_midi_channel, one_midi_channel, strict_io, instrument, 0, route_group, count, name_template, order, ARDOUR::Normal, true, trigger_visibility);
+
+		if (tracks.size() != count) {
+			error << string_compose(P_("could not create %1 new SuperCollider track", "could not create %1 new SuperCollider tracks", count), count) << endmsg;
+		}
+		break;
+	}
 	case AddRouteDialog::MidiBus:
 		session_add_midi_route (false, route_group, count, name_template, strict_io, instrument, 0, order, false);
 		break;

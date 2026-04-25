@@ -27,6 +27,7 @@
 #include "ardour/port_insert.h"
 #include "ardour/route.h"
 #include "ardour/session.h"
+#include "ardour/supercollider_track.h"
 
 #include "gtkmm2ext/gui_thread.h"
 #include "gtkmm2ext/utils.h"
@@ -127,7 +128,13 @@ ProcessorUIFrame::save_state () const
 
 RoutePropertiesBox::RoutePropertiesBox ()
 	: _insert_box (nullptr)
+	, _supercollider_synthdef_label (_("SynthDef"))
+	, _supercollider_auto_boot_button (_("Auto-start runtime"))
+	, _supercollider_apply_button (_("Apply"))
+	, _supercollider_restart_button (_("Restart"))
 	, _show_insert (false)
+	, _updating_supercollider_ui (false)
+	, _supercollider_dirty (false)
 	, _idle_refill_processors_id (-1)
 {
 	_scroller.set_policy (Gtk::POLICY_AUTOMATIC, Gtk::POLICY_NEVER);
@@ -142,13 +149,44 @@ RoutePropertiesBox::RoutePropertiesBox ()
 	viewport->set_border_width(0);
 
 	_box.set_spacing (4);
+	_left_box.set_spacing (4);
+	_supercollider_frame.set_no_show_all ();
 	_insert_frame.set_no_show_all ();
+	_supercollider_status.set_alignment (0.0, 0.5);
+	_supercollider_synthdef_label.set_alignment (0.0, 0.5);
+	_supercollider_source_buffer = Gtk::TextBuffer::create ();
+	_supercollider_source_view.set_buffer (_supercollider_source_buffer);
+	_supercollider_source_view.set_wrap_mode (Gtk::WRAP_WORD_CHAR);
+	_supercollider_source_view.set_size_request (420, 180);
+	_supercollider_source_scroller.set_policy (Gtk::POLICY_AUTOMATIC, Gtk::POLICY_AUTOMATIC);
+	_supercollider_source_scroller.add (_supercollider_source_view);
+	_supercollider_controls.set_spacing (6);
+	_supercollider_controls.pack_start (_supercollider_synthdef_label, false, false);
+	_supercollider_controls.pack_start (_supercollider_synthdef_entry, true, true);
+	_supercollider_controls.pack_start (_supercollider_auto_boot_button, false, false);
+	_supercollider_controls.pack_start (_supercollider_apply_button, false, false);
+	_supercollider_controls.pack_start (_supercollider_restart_button, false, false);
+	_supercollider_box.set_spacing (6);
+	_supercollider_box.pack_start (_supercollider_status, false, false);
+	_supercollider_box.pack_start (_supercollider_controls, false, false);
+	_supercollider_box.pack_start (_supercollider_source_scroller, true, true);
+	_supercollider_frame.add (_supercollider_box);
+	_supercollider_frame.set_label (_("SuperCollider"));
+	_supercollider_frame.set_padding (4);
 
-	pack_start (_insert_frame, false, false, 4);
+	_left_box.pack_start (_supercollider_frame, false, false, 4);
+	_left_box.pack_start (_insert_frame, false, false, 4);
+	pack_start (_left_box, false, false, 4);
 	pack_start (_scroller, true, true);
 	show_all();
+	_supercollider_frame.hide ();
 
 	ARDOUR_UI::instance()->ActionsReady.connect_same_thread (_forever_connections, std::bind (&RoutePropertiesBox::ui_actions_ready, this));
+	_supercollider_source_buffer->signal_changed().connect (sigc::mem_fun (*this, &RoutePropertiesBox::mark_supercollider_editor_dirty));
+	_supercollider_synthdef_entry.signal_changed().connect (sigc::mem_fun (*this, &RoutePropertiesBox::mark_supercollider_editor_dirty));
+	_supercollider_auto_boot_button.signal_toggled().connect (sigc::mem_fun (*this, &RoutePropertiesBox::mark_supercollider_editor_dirty));
+	_supercollider_apply_button.signal_clicked().connect (sigc::mem_fun (*this, &RoutePropertiesBox::apply_supercollider_changes));
+	_supercollider_restart_button.signal_clicked().connect (sigc::mem_fun (*this, &RoutePropertiesBox::restart_supercollider_runtime));
 }
 
 RoutePropertiesBox::~RoutePropertiesBox ()
@@ -169,6 +207,7 @@ RoutePropertiesBox::session_going_away ()
 	SessionHandlePtr::session_going_away ();
 
 	_insert_frame.remove ();
+	_supercollider_frame.remove ();
 	drop_plugin_uis ();
 	drop_route ();
 	delete _insert_box;
@@ -190,6 +229,7 @@ RoutePropertiesBox::set_session (ARDOUR::Session* s) {
 	_insert_frame.add (*_insert_box);
 	_insert_frame.set_padding (4);
 	_insert_frame.set_size_request (144 * ui_scale, 236 * ui_scale);
+	_supercollider_frame.set_size_request (350 * ui_scale, 280 * ui_scale);
 
 	_session->SurroundMasterAddedOrRemoved.connect (_session_connections, invalidator (*this), std::bind (&RoutePropertiesBox::surround_master_added_or_removed, this), gui_context());
 }
@@ -213,6 +253,7 @@ RoutePropertiesBox::set_route (std::shared_ptr<Route> r, bool force_update)
 	}
 
 	_route = r;
+	_supercollider_dirty = false;
 	_route_connections.drop_connections ();
 
 	_route->processors_changed.connect (_route_connections, invalidator (*this), std::bind (&RoutePropertiesBox::idle_refill_processors, this), gui_context());
@@ -225,6 +266,7 @@ RoutePropertiesBox::set_route (std::shared_ptr<Route> r, bool force_update)
 	}
 
 	_insert_box->set_route (r);
+	sync_supercollider_editor ();
 	refill_processors ();
 }
 
@@ -268,6 +310,7 @@ RoutePropertiesBox::update_processor_box_visibility ()
 void
 RoutePropertiesBox::property_changed (const PBD::PropertyChange& what_changed)
 {
+	sync_supercollider_editor ();
 }
 
 void
@@ -276,6 +319,8 @@ RoutePropertiesBox::drop_route ()
 	drop_plugin_uis ();
 	_route.reset ();
 	_route_connections.drop_connections ();
+	_supercollider_frame.hide ();
+	_supercollider_dirty = false;
 	if (_idle_refill_processors_id >= 0) {
 		g_source_destroy (g_main_context_find_source_by_id (NULL, _idle_refill_processors_id));
 		_idle_refill_processors_id = -1;
@@ -380,4 +425,85 @@ RoutePropertiesBox::refill_processors ()
 	}
 	update_processor_box_visibility ();
 	_idle_refill_processors_id = -1;
+}
+
+void
+RoutePropertiesBox::sync_supercollider_editor ()
+{
+	std::shared_ptr<SuperColliderTrack> sct = std::dynamic_pointer_cast<SuperColliderTrack> (_route);
+	if (!sct) {
+		_supercollider_frame.hide ();
+		return;
+	}
+
+	std::string status_text;
+	if (_supercollider_dirty) {
+		status_text = _("Runtime status: unsaved changes");
+	} else if (sct->supercollider_runtime_running ()) {
+		status_text = _("Runtime status: running");
+	} else if (!sct->supercollider_runtime_last_error ().empty ()) {
+		status_text = string_compose (_("Runtime status: %1"), sct->supercollider_runtime_last_error ());
+	} else if (!sct->supercollider_runtime_available ()) {
+		status_text = _("Runtime status: sclang not found on PATH");
+	} else {
+		status_text = _("Runtime status: stopped");
+	}
+
+	_updating_supercollider_ui = true;
+	_supercollider_synthdef_entry.set_text (sct->supercollider_synthdef ());
+	_supercollider_auto_boot_button.set_active (sct->supercollider_auto_boot ());
+	_supercollider_source_buffer->set_text (sct->supercollider_source ());
+	_supercollider_status.set_text (status_text);
+	_supercollider_apply_button.set_sensitive (_supercollider_dirty);
+	_supercollider_restart_button.set_sensitive (sct->supercollider_auto_boot () && sct->supercollider_runtime_available ());
+	_updating_supercollider_ui = false;
+	_supercollider_frame.show_all ();
+}
+
+void
+RoutePropertiesBox::mark_supercollider_editor_dirty ()
+{
+	if (_updating_supercollider_ui) {
+		return;
+	}
+
+	if (!std::dynamic_pointer_cast<SuperColliderTrack> (_route)) {
+		return;
+	}
+
+	_supercollider_dirty = true;
+	_supercollider_status.set_text (_("Runtime status: unsaved changes"));
+	_supercollider_apply_button.set_sensitive (true);
+}
+
+void
+RoutePropertiesBox::apply_supercollider_changes ()
+{
+	std::shared_ptr<SuperColliderTrack> sct = std::dynamic_pointer_cast<SuperColliderTrack> (_route);
+	if (!sct) {
+		return;
+	}
+
+	sct->set_supercollider_synthdef (_supercollider_synthdef_entry.get_text ());
+	sct->set_supercollider_auto_boot (_supercollider_auto_boot_button.get_active ());
+	sct->set_supercollider_source (_supercollider_source_buffer->get_text ());
+
+	_supercollider_dirty = false;
+	sync_supercollider_editor ();
+}
+
+void
+RoutePropertiesBox::restart_supercollider_runtime ()
+{
+	std::shared_ptr<SuperColliderTrack> sct = std::dynamic_pointer_cast<SuperColliderTrack> (_route);
+	if (!sct) {
+		return;
+	}
+
+	if (_supercollider_dirty) {
+		apply_supercollider_changes ();
+	}
+
+	sct->restart_supercollider_runtime ();
+	sync_supercollider_editor ();
 }

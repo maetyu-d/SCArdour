@@ -88,6 +88,7 @@
 #include "ardour/scene_changer.h"
 #include "ardour/midi_patch_manager.h"
 #include "ardour/midi_track.h"
+#include "ardour/supercollider_track.h"
 #include "ardour/midi_ui.h"
 #include "ardour/mixer_scene.h"
 #include "ardour/operations.h"
@@ -121,6 +122,7 @@
 #include "ardour/smf_source.h"
 #include "ardour/solo_isolate_control.h"
 #include "ardour/source_factory.h"
+#include "ardour/supercollider_session.h"
 #include "ardour/speakers.h"
 #include "ardour/surround_return.h"
 #include "ardour/tempo.h"
@@ -251,6 +253,7 @@ Session::Session (AudioEngine &eng,
 	, loop_changing (false)
 	, last_loopend (0)
 	, _session_dir (new SessionDirectory (fullpath))
+	, _supercollider_runtime (new SuperColliderSessionRuntime (*this))
 	, _current_snapshot_name (snapshot_name)
 	, state_tree (0)
 	, _state_of_the_state (StateOfTheState (CannotSave | InitialConnecting | Loading))
@@ -588,6 +591,18 @@ Session::Session (AudioEngine &eng,
 Session::~Session ()
 {
 	destroy ();
+}
+
+SuperColliderSessionRuntime&
+Session::supercollider_runtime ()
+{
+	return *_supercollider_runtime;
+}
+
+SuperColliderSessionRuntime const&
+Session::supercollider_runtime () const
+{
+	return *_supercollider_runtime;
 }
 
 unsigned int
@@ -2833,6 +2848,95 @@ Session::new_midi_track (const ChanCount& input, const ChanCount& output, bool s
 	if (!new_routes.empty()) {
 		ChanCount existing_inputs;
 		ChanCount existing_outputs;
+		count_existing_track_channels (existing_inputs, existing_outputs);
+
+		add_routes (new_routes, input_auto_connect, !instrument, order);
+		load_and_connect_instruments (new_routes, strict_io, instrument, pset, existing_outputs);
+		if (instrument) {
+			InstrumentRouteAdded (new_routes);
+		}
+	}
+
+	return ret;
+}
+
+list<std::shared_ptr<SuperColliderTrack> >
+Session::new_supercollider_track (const ChanCount& input, const ChanCount& output, bool strict_io,
+                                  std::shared_ptr<PluginInfo> instrument, Plugin::PresetRecord* pset,
+                                  std::shared_ptr<RouteGroup> route_group, uint32_t how_many,
+                                  string name_template, PresentationInfo::order_t order,
+                                  TrackMode mode, bool input_auto_connect,
+                                  bool trigger_visibility)
+{
+	string track_name;
+	uint32_t track_id = 0;
+	RouteList new_routes;
+	list<std::shared_ptr<SuperColliderTrack> > ret;
+
+	const string name_pattern = "SuperCollider";
+	bool const use_number = (how_many != 1) || name_template.empty () || (name_template == name_pattern);
+
+	while (how_many) {
+		if (!find_route_name (name_template.empty() ? _(name_pattern.c_str()) : name_template, ++track_id, track_name, use_number)) {
+			error << "cannot find name for new supercollider track" << endmsg;
+			goto failed;
+		}
+
+		std::shared_ptr<SuperColliderTrack> track;
+
+		try {
+			track.reset (new SuperColliderTrack (*this, track_name, mode));
+
+			if (track->init ()) {
+				goto failed;
+			}
+
+			if (strict_io) {
+				track->set_strict_io (true);
+			}
+
+			BOOST_MARK_TRACK (track);
+
+			{
+				PBD::Mutex::Lock lm (AudioEngine::instance()->process_lock ());
+				if (track->input()->ensure_io (input, false )) {
+					error << "cannot configure " << input << " out configuration for new supercollider track" << endmsg;
+					goto failed;
+				}
+
+				if (track->output()->ensure_io (output, false)) {
+					error << "cannot configure " << output << " out configuration for new supercollider track" << endmsg;
+					goto failed;
+				}
+			}
+
+			if (route_group) {
+				route_group->add (track);
+			}
+
+			track->presentation_info ().set_trigger_track (trigger_visibility);
+
+			new_routes.push_back (track);
+			ret.push_back (track);
+		}
+
+		catch (failed_constructor &err) {
+			error << _("Session: could not create new supercollider track.") << endmsg;
+			goto failed;
+		}
+
+		catch (AudioEngine::PortRegistrationFailure& pfe) {
+			error << string_compose (_("A required port for SuperCollider I/O could not be created (%1).\nYou may need to restart the Audio/MIDI engine to fix this."), pfe.what()) << endmsg;
+			goto failed;
+		}
+
+		--how_many;
+	}
+
+failed:
+	if (!new_routes.empty()) {
+		ChanCount existing_outputs;
+		ChanCount existing_inputs;
 		count_existing_track_channels (existing_inputs, existing_outputs);
 
 		add_routes (new_routes, input_auto_connect, !instrument, order);
@@ -8336,4 +8440,3 @@ Session::rec_enabled_triggerbox () const
 
 	return re_tb;
 }
-
