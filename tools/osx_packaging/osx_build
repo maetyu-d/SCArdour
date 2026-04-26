@@ -85,7 +85,7 @@ while [ $# -gt 0 ] ; do
 		APPNAME=SCArdour ;
 		BUNDLENAME=SCArdour${major_version} ;
 		lower_case_appname=scardour;
-		BUNDLE_ID_BASE=org.scardour
+		BUNDLE_ID_BASE=space.matd
 		shift ;;
 
 	#
