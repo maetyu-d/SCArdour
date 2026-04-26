@@ -29,13 +29,22 @@
 
 #include <boost/algorithm/string.hpp>
 
+#include <fstream>
+
+#include <glibmm/fileutils.h>
+
 #include "gtkmm2ext/utils.h"
 
 #include "ardour/profile.h"
 #include "ardour/rc_configuration.h"
+#include "ardour/midi_source.h"
+#include "ardour/playlist.h"
+#include "ardour/region_factory.h"
 #include "ardour/smf_source.h"
+#include "ardour/supercollider_track.h"
 
 #include "pbd/error.h"
+#include "pbd/stateful_diff_command.h"
 
 #include "canvas/arc.h"
 #include "canvas/canvas.h"
@@ -66,6 +75,8 @@
 #include "region_peak_cursor.h"
 #include "ui_config.h"
 #include "verbose_cursor.h"
+#include "ardour_dialog.h"
+#include "ardour_message.h"
 
 #include "pbd/i18n.h"
 
@@ -77,6 +88,122 @@ using namespace Gtk;
 using namespace Glib;
 using namespace Gtkmm2ext;
 using namespace Editing;
+
+namespace {
+
+bool
+is_supercollider_source_path (std::string const& path)
+{
+	std::string::size_type const dot = path.find_last_of ('.');
+	if (dot == std::string::npos) {
+		return false;
+	}
+
+	std::string ext = path.substr (dot);
+	std::transform (ext.begin (), ext.end (), ext.begin (), ::tolower);
+	return ext == ".sc" || ext == ".scd";
+}
+
+std::string
+supercollider_file_display_name (std::string const& path)
+{
+	return Glib::path_get_basename (path);
+}
+
+class SuperColliderRegionLengthDialog : public ArdourDialog
+{
+public:
+	SuperColliderRegionLengthDialog (std::string const& file_name)
+		: ArdourDialog (_("Import SuperCollider File"), true, false)
+		, _file_label (string_compose (_("Import \"%1\" onto this SuperCollider track"), file_name))
+		, _bars_button (_("Bars"))
+		, _seconds_button (_("Seconds"))
+		, _bars_label (_("Bars"))
+		, _seconds_label (_("Seconds"))
+	{
+		get_vbox ()->set_border_width (12);
+		get_vbox ()->set_spacing (8);
+
+		_file_label.set_alignment (0.0, 0.5);
+		_hint_label.set_text (_("Choose how long the new SC region should be."));
+		_hint_label.set_alignment (0.0, 0.5);
+
+		_bars_button.set_active (true);
+		Gtk::RadioButton::Group group = _bars_button.get_group ();
+		_seconds_button.set_group (group);
+
+		_bars_spin.set_range (1.0, 1024.0);
+		_bars_spin.set_increments (1.0, 4.0);
+		_bars_spin.set_digits (0);
+		_bars_spin.set_value (4.0);
+		_bars_spin.set_numeric (true);
+
+		_seconds_spin.set_range (0.05, 36000.0);
+		_seconds_spin.set_increments (0.25, 1.0);
+		_seconds_spin.set_digits (2);
+		_seconds_spin.set_value (4.0);
+		_seconds_spin.set_numeric (true);
+
+		_rows.set_spacing (6);
+		_rows.pack_start (_bars_button, false, false);
+		_rows.pack_start (_bars_label, false, false);
+		_rows.pack_start (_bars_spin, false, false);
+		_rows.pack_start (_seconds_button, false, false);
+		_rows.pack_start (_seconds_label, false, false);
+		_rows.pack_start (_seconds_spin, false, false);
+
+		get_vbox ()->pack_start (_file_label, false, false);
+		get_vbox ()->pack_start (_hint_label, false, false);
+		get_vbox ()->pack_start (_rows, false, false);
+
+		add_button (Gtk::Stock::CANCEL, Gtk::RESPONSE_CANCEL);
+		Gtk::Button* import_button = manage (new Gtk::Button (_("Import")));
+		import_button->signal_clicked ().connect (sigc::bind (sigc::mem_fun (*this, &ArdourDialog::response), Gtk::RESPONSE_OK));
+		get_action_area ()->pack_start (*import_button);
+
+		show_all ();
+	}
+
+	bool use_bars () const
+	{
+		return _bars_button.get_active ();
+	}
+
+	int bars () const
+	{
+		return std::max (1, _bars_spin.get_value_as_int ());
+	}
+
+	double seconds () const
+	{
+		return std::max (0.05, _seconds_spin.get_value ());
+	}
+
+private:
+	Gtk::Label       _file_label;
+	Gtk::Label       _hint_label;
+	Gtk::HBox        _rows;
+	Gtk::RadioButton _bars_button;
+	Gtk::RadioButton _seconds_button;
+	Gtk::Label       _bars_label;
+	Gtk::Label       _seconds_label;
+	Gtk::SpinButton  _bars_spin;
+	Gtk::SpinButton  _seconds_spin;
+};
+
+bool
+read_supercollider_source_file (std::string const& path, std::string& contents)
+{
+	std::ifstream input (path.c_str (), std::ios::in | std::ios::binary);
+	if (!input) {
+		return false;
+	}
+
+	contents.assign ((std::istreambuf_iterator<char> (input)), std::istreambuf_iterator<char> ());
+	return true;
+}
+
+} // namespace
 
 void
 Editor::initialize_canvas ()
@@ -441,9 +568,12 @@ Editor::drop_paths_part_two (const vector<string>& paths, timepos_t const & p, d
 
 	vector<string> midi_paths;
 	vector<string> audio_paths;
+	vector<string> supercollider_paths;
 
 	for (vector<string>::const_iterator i = paths.begin(); i != paths.end(); ++i) {
-		if (SMFSource::safe_midi_file_extension (*i)) {
+		if (is_supercollider_source_path (*i)) {
+			supercollider_paths.push_back (*i);
+		} else if (SMFSource::safe_midi_file_extension (*i)) {
 			midi_paths.push_back (*i);
 		} else {
 			audio_paths.push_back (*i);
@@ -470,6 +600,72 @@ Editor::drop_paths_part_two (const vector<string>& paths, timepos_t const & p, d
 		/* check that its a track, not a bus */
 
 		if (tv->track()) {
+			std::shared_ptr<SuperColliderTrack> sct = std::dynamic_pointer_cast<SuperColliderTrack> (tv->track ());
+			if (!supercollider_paths.empty ()) {
+				if (!sct) {
+					ArdourMessageDialog msg (_("SuperCollider files can only be dropped onto SuperCollider audio or MIDI tracks."), false, Gtk::MESSAGE_INFO, Gtk::BUTTONS_OK, true);
+					msg.run ();
+				} else if (supercollider_paths.size () > 1) {
+					ArdourMessageDialog msg (_("Drop one SuperCollider file at a time onto a SuperCollider track."), false, Gtk::MESSAGE_INFO, Gtk::BUTTONS_OK, true);
+					msg.run ();
+				} else {
+					std::string source_text;
+					if (!read_supercollider_source_file (supercollider_paths.front (), source_text)) {
+						ArdourMessageDialog msg (string_compose (_("Could not read SuperCollider file \"%1\"."), supercollider_file_display_name (supercollider_paths.front ())), false, Gtk::MESSAGE_ERROR, Gtk::BUTTONS_OK, true);
+						msg.run ();
+					} else {
+						SuperColliderRegionLengthDialog dialog (supercollider_file_display_name (supercollider_paths.front ()));
+						if (dialog.run () == Gtk::RESPONSE_OK) {
+							Temporal::TempoMap::SharedPtr tempo_map = Temporal::TempoMap::use ();
+							Temporal::Beats const start_beats = tempo_map->quarters_at (pos);
+							Temporal::Beats end_beats = start_beats;
+
+							if (dialog.use_bars ()) {
+								end_beats = tempo_map->bbtwalk_to_quarters (tempo_map->bbt_at (pos), Temporal::BBT_Offset (dialog.bars (), 0, 0));
+							} else {
+								timepos_t const end_pos = pos + timecnt_t (samplepos_t (dialog.seconds () * _session->sample_rate ()), pos);
+								end_beats = tempo_map->quarters_at (end_pos);
+							}
+
+							Temporal::Beats const beat_length = std::max (Temporal::Beats::ticks (1), end_beats - start_beats);
+
+							std::shared_ptr<MidiSource> ms = _session->create_midi_source_for_session (string_compose ("%1 SC", sct->name ()));
+							if (!ms) {
+								ArdourMessageDialog msg (_("Could not create a placeholder region for the SuperCollider clip."), false, Gtk::MESSAGE_ERROR, Gtk::BUTTONS_OK, true);
+								msg.run ();
+							} else {
+								PBD::PropertyList plist;
+								plist.add (ARDOUR::Properties::start, Temporal::Beats ());
+								plist.add (ARDOUR::Properties::length, beat_length);
+								plist.add (ARDOUR::Properties::name, string_compose ("%1: %2", sct->supercollider_generates_midi () ? _("SC MIDI") : _("SC"), sct->supercollider_synthdef ()));
+								plist.add (ARDOUR::Properties::layer, 0);
+								plist.add (ARDOUR::Properties::whole_file, true);
+								plist.add (ARDOUR::Properties::external, false);
+								plist.add (ARDOUR::Properties::opaque, true);
+
+								std::shared_ptr<Region> const region = RegionFactory::create (ms, plist);
+								std::shared_ptr<Playlist> const playlist = sct->playlist ();
+								if (!region || !playlist) {
+									ArdourMessageDialog msg (_("Could not create a SuperCollider region on this track."), false, Gtk::MESSAGE_ERROR, Gtk::BUTTONS_OK, true);
+									msg.run ();
+								} else {
+									PublicEditor::instance ().begin_reversible_command (_("Import SuperCollider File"));
+									sct->clear_changes ();
+									sct->set_supercollider_source (source_text);
+									_session->add_command (new StatefulDiffCommand (sct));
+									playlist->clear_changes ();
+									playlist->clear_owned_changes ();
+									playlist->add_region (region, pos, 1.0, false);
+									playlist->rdiff_and_add_command (_session);
+									PublicEditor::instance ().commit_reversible_command ();
+									sct->PropertyChanged (PBD::PropertyChange ());
+								}
+							}
+						}
+					}
+				}
+			}
+
 			do_import (midi_paths, Editing::ImportSerializeFiles, ImportToTrack,
 				   SrcBest, SMFFileAndTrackName, SMFTempoIgnore, pos, std::shared_ptr<ARDOUR::PluginInfo>(), tv->track ());
 
