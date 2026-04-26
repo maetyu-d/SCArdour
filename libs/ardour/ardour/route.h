@@ -70,6 +70,7 @@ class RoutePinWindowProxy;
 class PatchChangeGridDialog;
 class RouteCommentEditor;
 class SuperColliderTrackEditor;
+class SuperColliderFxEditor;
 
 namespace ARDOUR {
 
@@ -149,6 +150,24 @@ public:
 	void set_comment_editor (RouteCommentEditor* w) { _comment_editor_window = w; }
 	SuperColliderTrackEditor* supercollider_editor () const { return _supercollider_editor_window; }
 	void set_supercollider_editor (SuperColliderTrackEditor* w) { _supercollider_editor_window = w; }
+	SuperColliderFxEditor* supercollider_fx_editor () const { return _supercollider_fx_editor_window; }
+	void set_supercollider_fx_editor (SuperColliderFxEditor* w) { _supercollider_fx_editor_window = w; }
+
+	bool supports_supercollider_fx () const;
+	void set_supercollider_fx_enabled (bool yn);
+	bool supercollider_fx_enabled () const { return _supercollider_fx_enabled; }
+	void set_supercollider_fx_source (std::string const&);
+	std::string const& supercollider_fx_source () const { return _supercollider_fx_source; }
+	void set_supercollider_fx_synthdef (std::string const&);
+	std::string const& supercollider_fx_synthdef () const { return _supercollider_fx_synthdef; }
+	void set_supercollider_fx_auto_synthdef (bool yn);
+	bool supercollider_fx_auto_synthdef () const { return _supercollider_fx_auto_synthdef; }
+	bool refresh_supercollider_fx ();
+	std::string const& supercollider_fx_last_error () const { return _supercollider_fx_last_error; }
+
+	static std::string infer_supercollider_synthdef (std::string const&);
+	static std::string default_supercollider_fx_source (uint32_t audio_channels);
+	static std::string default_supercollider_fx_synthdef ();
 
 	bool set_name (const std::string& str);
 	static void set_name_in_state (XMLNode &, const std::string &);
@@ -393,6 +412,7 @@ public:
 	PBD::Signal<void()> active_changed;
 	PBD::Signal<void()> denormal_protection_changed;
 	PBD::Signal<void()> comment_changed;
+	PBD::Signal<void()> supercollider_fx_changed;
 
 	bool is_track();
 
@@ -679,6 +699,13 @@ protected:
 	std::string          _comment;
 	RouteCommentEditor*  _comment_editor_window;
 	SuperColliderTrackEditor* _supercollider_editor_window;
+	SuperColliderFxEditor* _supercollider_fx_editor_window;
+	std::string _supercollider_fx_source;
+	std::string _supercollider_fx_synthdef;
+	std::string _supercollider_fx_last_error;
+	bool _supercollider_fx_auto_synthdef;
+	bool _supercollider_fx_enabled;
+	bool _supercollider_fx_restore_pending;
 
 	bool           _have_internal_generator;
 	DataType       _default_type;

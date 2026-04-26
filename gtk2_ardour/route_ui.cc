@@ -1884,6 +1884,34 @@ RouteUI::open_supercollider_editor ()
 }
 
 void
+RouteUI::toggle_supercollider_fx_editor ()
+{
+	if (!_route || !_route->supports_supercollider_fx ()) {
+		return;
+	}
+
+	SuperColliderFxEditor* sce = _route->supercollider_fx_editor ();
+	if (!sce) {
+		sce = new SuperColliderFxEditor (_route);
+	}
+	sce->toggle ();
+}
+
+void
+RouteUI::open_supercollider_fx_editor ()
+{
+	if (!_route || !_route->supports_supercollider_fx ()) {
+		return;
+	}
+
+	SuperColliderFxEditor* sce = _route->supercollider_fx_editor ();
+	if (!sce) {
+		sce = new SuperColliderFxEditor (_route);
+	}
+	sce->open ();
+}
+
+void
 RouteUI::set_route_active (bool a, bool apply_to_selection)
 {
 	if (apply_to_selection) {

@@ -2365,6 +2365,42 @@ AUPlugin::has_editor () const
 	return true;
 }
 
+bool
+AUPlugin::set_supercollider_synthdef (std::string const& synthdef)
+{
+	if (!unit) {
+		return false;
+	}
+
+	CFStringRef cf_name = CFStringCreateWithCString (kCFAllocatorDefault, synthdef.c_str (), kCFStringEncodingUTF8);
+	if (!cf_name) {
+		return false;
+	}
+
+	AudioUnitPropertyID const prop = 0x73636678;
+	OSStatus const err = unit->SetProperty (prop, kAudioUnitScope_Global, 0, &cf_name, sizeof (CFStringRef));
+	CFRelease (cf_name);
+	return err == noErr;
+}
+
+bool
+AUPlugin::set_supercollider_synthdef_path (std::string const& path)
+{
+	if (!unit) {
+		return false;
+	}
+
+	CFStringRef cf_path = CFStringCreateWithCString (kCFAllocatorDefault, path.c_str (), kCFStringEncodingUTF8);
+	if (!cf_path) {
+		return false;
+	}
+
+	AudioUnitPropertyID const prop = 0x73636679;
+	OSStatus const err = unit->SetProperty (prop, kAudioUnitScope_Global, 0, &cf_path, sizeof (CFStringRef));
+	CFRelease (cf_path);
+	return err == noErr;
+}
+
 /* ****************************************************************************/
 
 AUPluginInfo::AUPluginInfo (std::shared_ptr<CAComponentDescription> d)

@@ -670,6 +670,9 @@ RouteTimeAxisView::build_display_menu ()
 		if (std::dynamic_pointer_cast<ARDOUR::SuperColliderTrack> (_route)) {
 			items.push_back (MenuElem (_("Open SuperCollider Editor..."), sigc::mem_fun (*this, &RouteUI::open_supercollider_editor)));
 		}
+		if (_route->supports_supercollider_fx ()) {
+			items.push_back (MenuElem (_("Open SuperCollider FX Editor..."), sigc::mem_fun (*this, &RouteUI::open_supercollider_fx_editor)));
+		}
 
 		items.push_back (MenuElem (_("Inputs..."), sigc::mem_fun (*this, &RouteUI::edit_input_configuration)));
 

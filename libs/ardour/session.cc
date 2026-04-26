@@ -195,7 +195,7 @@ is_supercollider_au (ARDOUR::PluginInfoPtr const& info)
 }
 
 std::shared_ptr<ARDOUR::PluginInsert>
-find_supercollider_insert (std::shared_ptr<ARDOUR::Route> const& route)
+find_supercollider_insert_impl (std::shared_ptr<ARDOUR::Route> const& route)
 {
 	if (!route) {
 		return std::shared_ptr<ARDOUR::PluginInsert> ();
@@ -3156,7 +3156,7 @@ Session::ensure_supercollider_instrument (std::shared_ptr<Route> const& route, b
 		return false;
 	}
 
-	std::shared_ptr<PluginInsert> const existing_sc = find_supercollider_insert (route);
+	std::shared_ptr<PluginInsert> const existing_sc = find_supercollider_insert_impl (route);
 	if (existing_sc) {
 		return true;
 	}
@@ -3198,7 +3198,65 @@ Session::ensure_supercollider_instrument (std::shared_ptr<Route> const& route, b
 		auto_connect_route (route, false, true, ChanCount (), ChanCount (), ChanCount (), existing_outputs);
 	}
 
-	bool const found = static_cast<bool> (find_supercollider_insert (route));
+	bool const found = static_cast<bool> (find_supercollider_insert_impl (route));
+	if (!found && error_out) {
+		*error_out = "SuperColliderAU was inserted but is not visible in the route processor list";
+	}
+	return found;
+}
+
+std::shared_ptr<PluginInsert>
+Session::find_supercollider_insert (std::shared_ptr<Route> const& route) const
+{
+	return find_supercollider_insert_impl (route);
+}
+
+bool
+Session::ensure_supercollider_effect (std::shared_ptr<Route> const& route, bool strict_io, std::string* error_out)
+{
+	if (!route) {
+		if (error_out) {
+			*error_out = "No route available";
+		}
+		return false;
+	}
+
+	std::shared_ptr<PluginInfo> const effect = supercollider_instrument ();
+	if (!effect) {
+		if (error_out) {
+			*error_out = "SuperColliderAU was not found in the scanned AudioUnit list";
+		}
+		return false;
+	}
+
+	std::shared_ptr<PluginInsert> const existing_sc = find_supercollider_insert_impl (route);
+	if (existing_sc) {
+		return true;
+	}
+
+	PluginPtr const plugin = effect->load (*this);
+	if (!plugin) {
+		if (error_out) {
+			*error_out = string_compose ("AudioUnit load failed for %1 (%2)", effect->name, effect->unique_id);
+		}
+		return false;
+	}
+
+	std::shared_ptr<PluginInsert> insert (new PluginInsert (*this, *route, plugin));
+	if (strict_io) {
+		insert->set_strict_io (true);
+	}
+
+	Route::ProcessorStreams err;
+	int const rv = route->add_processor (insert, PreFader, &err, Config->get_new_plugins_active ());
+	if (rv != 0) {
+		if (error_out) {
+			*error_out = string_compose ("Processor insertion failed at index %1 with stream request %2", err.index, err.count);
+		}
+		return false;
+	}
+
+	bool const found = static_cast<bool> (find_supercollider_insert_impl (route));
 	if (!found && error_out) {
 		*error_out = "SuperColliderAU was inserted but is not visible in the route processor list";
 	}

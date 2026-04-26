@@ -36,6 +36,8 @@
 
 #include "widgets/frame.h"
 
+class SuperColliderFxEditor;
+
 namespace ARDOUR {
 	class Route;
 	class Processor;
@@ -74,6 +76,8 @@ private:
 	void supercollider_source_or_autofill_changed ();
 	void apply_supercollider_changes ();
 	void restart_supercollider_runtime ();
+	void sync_supercollider_fx_access ();
+	void open_supercollider_fx_editor ();
 
 	static int _idle_refill_processors (gpointer);
 
@@ -98,6 +102,11 @@ private:
 	Gtk::ScrolledWindow       _supercollider_source_scroller;
 	Gtk::TextView             _supercollider_source_view;
 	Glib::RefPtr<Gtk::TextBuffer> _supercollider_source_buffer;
+
+	ArdourWidgets::Frame      _supercollider_fx_frame;
+	Gtk::VBox                 _supercollider_fx_box;
+	Gtk::Label                _supercollider_fx_status;
+	Gtk::Button               _supercollider_fx_open_button;
 
 	ArdourWidgets::Frame _insert_frame;
 	bool                 _show_insert;

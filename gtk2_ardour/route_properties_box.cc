@@ -40,6 +40,7 @@
 #include "plugin_ui.h"
 #include "port_insert_ui.h"
 #include "route_properties_box.h"
+#include "supercollider_fx_editor.h"
 #include "timers.h"
 #include "ui_config.h"
 
@@ -133,6 +134,7 @@ RoutePropertiesBox::RoutePropertiesBox ()
 	, _supercollider_auto_boot_button (_("Auto-start runtime"))
 	, _supercollider_apply_button (_("Apply"))
 	, _supercollider_restart_button (_("Restart"))
+	, _supercollider_fx_open_button (_("Open SuperCollider FX Editor..."))
 	, _show_insert (false)
 	, _force_hide_insert (false)
 	, _updating_supercollider_ui (false)
@@ -153,8 +155,10 @@ RoutePropertiesBox::RoutePropertiesBox ()
 	_box.set_spacing (4);
 	_left_box.set_spacing (4);
 	_supercollider_frame.set_no_show_all ();
+	_supercollider_fx_frame.set_no_show_all ();
 	_insert_frame.set_no_show_all ();
 	_supercollider_status.set_alignment (0.0, 0.5);
+	_supercollider_fx_status.set_alignment (0.0, 0.5);
 	_supercollider_synthdef_label.set_alignment (0.0, 0.5);
 	_supercollider_source_buffer = Gtk::TextBuffer::create ();
 	_supercollider_source_view.set_buffer (_supercollider_source_buffer);
@@ -180,12 +184,21 @@ RoutePropertiesBox::RoutePropertiesBox ()
 	_supercollider_frame.set_label (_("SuperCollider"));
 	_supercollider_frame.set_padding (4);
 
+	_supercollider_fx_box.set_spacing (6);
+	_supercollider_fx_box.pack_start (_supercollider_fx_status, false, false);
+	_supercollider_fx_box.pack_start (_supercollider_fx_open_button, false, false);
+	_supercollider_fx_frame.add (_supercollider_fx_box);
+	_supercollider_fx_frame.set_label (_("SuperCollider FX"));
+	_supercollider_fx_frame.set_padding (4);
+
 	_left_box.pack_start (_supercollider_frame, false, false, 4);
+	_left_box.pack_start (_supercollider_fx_frame, false, false, 4);
 	_left_box.pack_start (_insert_frame, false, false, 4);
 	pack_start (_left_box, false, false, 4);
 	pack_start (_scroller, true, true);
 	show_all();
 	_supercollider_frame.hide ();
+	_supercollider_fx_frame.hide ();
 
 	ARDOUR_UI::instance()->ActionsReady.connect_same_thread (_forever_connections, std::bind (&RoutePropertiesBox::ui_actions_ready, this));
 	_supercollider_source_buffer->signal_changed().connect (sigc::mem_fun (*this, &RoutePropertiesBox::supercollider_source_or_autofill_changed));
@@ -194,6 +207,7 @@ RoutePropertiesBox::RoutePropertiesBox ()
 	_supercollider_auto_boot_button.signal_toggled().connect (sigc::mem_fun (*this, &RoutePropertiesBox::mark_supercollider_editor_dirty));
 	_supercollider_apply_button.signal_clicked().connect (sigc::mem_fun (*this, &RoutePropertiesBox::apply_supercollider_changes));
 	_supercollider_restart_button.signal_clicked().connect (sigc::mem_fun (*this, &RoutePropertiesBox::restart_supercollider_runtime));
+	_supercollider_fx_open_button.signal_clicked().connect (sigc::mem_fun (*this, &RoutePropertiesBox::open_supercollider_fx_editor));
 }
 
 RoutePropertiesBox::~RoutePropertiesBox ()
@@ -215,6 +229,7 @@ RoutePropertiesBox::session_going_away ()
 
 	_insert_frame.remove ();
 	_supercollider_frame.remove ();
+	_supercollider_fx_frame.remove ();
 	drop_plugin_uis ();
 	drop_route ();
 	delete _insert_box;
@@ -266,6 +281,7 @@ RoutePropertiesBox::set_route (std::shared_ptr<Route> r, bool force_update)
 	_route->processors_changed.connect (_route_connections, invalidator (*this), std::bind (&RoutePropertiesBox::idle_refill_processors, this), gui_context());
 	_route->PropertyChanged.connect (_route_connections, invalidator (*this), std::bind (&RoutePropertiesBox::property_changed, this, _1), gui_context ());
 	_route->DropReferences.connect (_route_connections, invalidator (*this), std::bind (&RoutePropertiesBox::drop_route, this), gui_context());
+	_route->supercollider_fx_changed.connect (_route_connections, invalidator (*this), std::bind (&RoutePropertiesBox::sync_supercollider_fx_access, this), gui_context());
 
 	std::shared_ptr<AudioTrack> at = std::dynamic_pointer_cast<AudioTrack>(_route);
 	if (at) {
@@ -274,6 +290,7 @@ RoutePropertiesBox::set_route (std::shared_ptr<Route> r, bool force_update)
 
 	_insert_box->set_route (r);
 	sync_supercollider_editor ();
+	sync_supercollider_fx_access ();
 	refill_processors ();
 }
 
@@ -331,6 +348,7 @@ void
 RoutePropertiesBox::property_changed (const PBD::PropertyChange& what_changed)
 {
 	sync_supercollider_editor ();
+	sync_supercollider_fx_access ();
 }
 
 void
@@ -340,6 +358,7 @@ RoutePropertiesBox::drop_route ()
 	_route.reset ();
 	_route_connections.drop_connections ();
 	_supercollider_frame.hide ();
+	_supercollider_fx_frame.hide ();
 	_supercollider_dirty = false;
 	if (_idle_refill_processors_id >= 0) {
 		g_source_destroy (g_main_context_find_source_by_id (NULL, _idle_refill_processors_id));
@@ -565,4 +584,42 @@ RoutePropertiesBox::restart_supercollider_runtime ()
 
 	sct->restart_supercollider_runtime ();
 	sync_supercollider_editor ();
+}
+
+void
+RoutePropertiesBox::sync_supercollider_fx_access ()
+{
+	if (!_route || !_route->supports_supercollider_fx ()) {
+		_supercollider_fx_frame.hide ();
+		return;
+	}
+
+	std::string status_text;
+	if (_route->supercollider_fx_enabled ()) {
+		if (_route->supercollider_fx_last_error ().empty ()) {
+			status_text = _("FX status: enabled");
+		} else {
+			status_text = string_compose (_("FX status: %1"), _route->supercollider_fx_last_error ());
+		}
+	} else {
+		status_text = _("FX status: disabled");
+	}
+
+	_supercollider_fx_status.set_text (status_text);
+	_supercollider_fx_frame.show_all ();
+}
+
+void
+RoutePropertiesBox::open_supercollider_fx_editor ()
+{
+	if (!_route || !_route->supports_supercollider_fx ()) {
+		return;
+	}
+
+	SuperColliderFxEditor* editor = _route->supercollider_fx_editor ();
+	if (!editor) {
+		editor = new SuperColliderFxEditor (_route);
+	}
+
+	editor->open ();
 }

@@ -104,6 +104,8 @@ class LIBARDOUR_API AUPlugin : public ARDOUR::Plugin
 	std::string current_preset() const;
 
 	bool has_editor () const;
+	bool set_supercollider_synthdef (std::string const&);
+	bool set_supercollider_synthdef_path (std::string const&);
 
 	bool match_variable_io (ChanCount& in, ChanCount& aux_in, ChanCount& out);
 	bool reconfigure_io (ChanCount in, ChanCount aux_in, ChanCount out);
@@ -270,4 +272,3 @@ private:
 typedef std::shared_ptr<AUPluginInfo> AUPluginInfoPtr;
 
 } // namespace ARDOUR
-
