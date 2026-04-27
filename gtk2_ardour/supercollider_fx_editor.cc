@@ -183,6 +183,9 @@ SuperColliderFxEditor::SuperColliderFxEditor (std::shared_ptr<Route> route)
 	, _enable_button (_("Enable FX"))
 	, _auto_synthdef_button (_("Auto-fill from source"))
 	, _apply_button (_("Apply FX"))
+	, _reapply_button (_("Reapply FX"))
+	, _restart_button (_("Restart FX Runtime"))
+	, _clear_button (_("Clear Stuck FX"))
 	, _load_button (_("Load .sc"))
 	, _save_button (_("Save .sc"))
 	, _updating (false)
@@ -198,6 +201,7 @@ SuperColliderFxEditor::SuperColliderFxEditor (std::shared_ptr<Route> route)
 	add (_vbox);
 	_vbox.set_spacing (8);
 	_controls_box.set_spacing (6);
+	_recovery_box.set_spacing (6);
 	_file_box.set_spacing (6);
 	_status_label.set_alignment (0.0, 0.5);
 	_detail_label.set_alignment (0.0, 0.5);
@@ -225,6 +229,10 @@ SuperColliderFxEditor::SuperColliderFxEditor (std::shared_ptr<Route> route)
 	_controls_box.pack_start (_enable_button, false, false);
 	_controls_box.pack_start (_apply_button, false, false);
 
+	_recovery_box.pack_start (_reapply_button, false, false);
+	_recovery_box.pack_start (_restart_button, false, false);
+	_recovery_box.pack_start (_clear_button, false, false);
+
 	_file_box.pack_start (_load_button, false, false);
 	_file_box.pack_start (_save_button, false, false);
 
@@ -232,6 +240,7 @@ SuperColliderFxEditor::SuperColliderFxEditor (std::shared_ptr<Route> route)
 	_vbox.pack_start (_detail_label, false, false);
 	_vbox.pack_start (_diagnostics_label, false, false);
 	_vbox.pack_start (_controls_box, false, false);
+	_vbox.pack_start (_recovery_box, false, false);
 	_vbox.pack_start (_file_box, false, false);
 	_vbox.pack_start (_source_scroller, true, true);
 
@@ -246,6 +255,9 @@ SuperColliderFxEditor::SuperColliderFxEditor (std::shared_ptr<Route> route)
 	_enable_button.signal_toggled ().connect (sigc::mem_fun (*this, &SuperColliderFxEditor::mark_dirty));
 	_auto_synthdef_button.signal_toggled ().connect (sigc::mem_fun (*this, &SuperColliderFxEditor::source_or_autofill_changed));
 	_apply_button.signal_clicked ().connect (sigc::mem_fun (*this, &SuperColliderFxEditor::apply_changes));
+	_reapply_button.signal_clicked ().connect (sigc::mem_fun (*this, &SuperColliderFxEditor::reapply_fx));
+	_restart_button.signal_clicked ().connect (sigc::mem_fun (*this, &SuperColliderFxEditor::restart_fx));
+	_clear_button.signal_clicked ().connect (sigc::mem_fun (*this, &SuperColliderFxEditor::clear_stuck_fx));
 	_load_button.signal_clicked ().connect (sigc::mem_fun (*this, &SuperColliderFxEditor::load_source_from_file));
 	_save_button.signal_clicked ().connect (sigc::mem_fun (*this, &SuperColliderFxEditor::save_source_to_file));
 
@@ -453,6 +465,51 @@ SuperColliderFxEditor::load_source_from_file ()
 	std::stringstream buffer;
 	buffer << in.rdbuf ();
 	_source_buffer->set_text (buffer.str ());
+}
+
+void
+SuperColliderFxEditor::reapply_fx ()
+{
+	if (!_route) {
+		return;
+	}
+
+	if (_dirty) {
+		apply_changes ();
+		return;
+	}
+
+	_route->reapply_supercollider_fx ();
+	sync_editor ();
+}
+
+void
+SuperColliderFxEditor::restart_fx ()
+{
+	if (!_route) {
+		return;
+	}
+
+	if (_dirty) {
+		apply_changes ();
+		if (_dirty) {
+			return;
+		}
+	}
+
+	_route->restart_supercollider_fx ();
+	sync_editor ();
+}
+
+void
+SuperColliderFxEditor::clear_stuck_fx ()
+{
+	if (!_route) {
+		return;
+	}
+
+	_route->clear_supercollider_fx ();
+	sync_editor ();
 }
 
 void

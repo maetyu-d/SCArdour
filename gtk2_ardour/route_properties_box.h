@@ -78,6 +78,9 @@ private:
 	void restart_supercollider_runtime ();
 	void sync_supercollider_fx_access ();
 	void open_supercollider_fx_editor ();
+	void reapply_supercollider_fx ();
+	void restart_supercollider_fx ();
+	void clear_supercollider_fx ();
 
 	static int _idle_refill_processors (gpointer);
 
@@ -105,8 +108,12 @@ private:
 
 	ArdourWidgets::Frame      _supercollider_fx_frame;
 	Gtk::VBox                 _supercollider_fx_box;
+	Gtk::HBox                 _supercollider_fx_buttons;
 	Gtk::Label                _supercollider_fx_status;
 	Gtk::Button               _supercollider_fx_open_button;
+	Gtk::Button               _supercollider_fx_reapply_button;
+	Gtk::Button               _supercollider_fx_restart_button;
+	Gtk::Button               _supercollider_fx_clear_button;
 
 	ArdourWidgets::Frame _insert_frame;
 	bool                 _show_insert;

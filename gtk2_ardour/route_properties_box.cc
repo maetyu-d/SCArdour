@@ -135,6 +135,9 @@ RoutePropertiesBox::RoutePropertiesBox ()
 	, _supercollider_apply_button (_("Apply"))
 	, _supercollider_restart_button (_("Restart"))
 	, _supercollider_fx_open_button (_("Open SuperCollider FX Editor..."))
+	, _supercollider_fx_reapply_button (_("Reapply FX"))
+	, _supercollider_fx_restart_button (_("Restart FX Runtime"))
+	, _supercollider_fx_clear_button (_("Clear Stuck FX"))
 	, _show_insert (false)
 	, _force_hide_insert (false)
 	, _updating_supercollider_ui (false)
@@ -186,8 +189,13 @@ RoutePropertiesBox::RoutePropertiesBox ()
 	_supercollider_frame.set_padding (4);
 
 	_supercollider_fx_box.set_spacing (6);
+	_supercollider_fx_buttons.set_spacing (6);
 	_supercollider_fx_box.pack_start (_supercollider_fx_status, false, false);
-	_supercollider_fx_box.pack_start (_supercollider_fx_open_button, false, false);
+	_supercollider_fx_buttons.pack_start (_supercollider_fx_open_button, false, false);
+	_supercollider_fx_buttons.pack_start (_supercollider_fx_reapply_button, false, false);
+	_supercollider_fx_buttons.pack_start (_supercollider_fx_restart_button, false, false);
+	_supercollider_fx_buttons.pack_start (_supercollider_fx_clear_button, false, false);
+	_supercollider_fx_box.pack_start (_supercollider_fx_buttons, false, false);
 	_supercollider_fx_frame.add (_supercollider_fx_box);
 	_supercollider_fx_frame.set_label (_("SuperCollider FX"));
 	_supercollider_fx_frame.set_padding (4);
@@ -209,6 +217,9 @@ RoutePropertiesBox::RoutePropertiesBox ()
 	_supercollider_apply_button.signal_clicked().connect (sigc::mem_fun (*this, &RoutePropertiesBox::apply_supercollider_changes));
 	_supercollider_restart_button.signal_clicked().connect (sigc::mem_fun (*this, &RoutePropertiesBox::restart_supercollider_runtime));
 	_supercollider_fx_open_button.signal_clicked().connect (sigc::mem_fun (*this, &RoutePropertiesBox::open_supercollider_fx_editor));
+	_supercollider_fx_reapply_button.signal_clicked().connect (sigc::mem_fun (*this, &RoutePropertiesBox::reapply_supercollider_fx));
+	_supercollider_fx_restart_button.signal_clicked().connect (sigc::mem_fun (*this, &RoutePropertiesBox::restart_supercollider_fx));
+	_supercollider_fx_clear_button.signal_clicked().connect (sigc::mem_fun (*this, &RoutePropertiesBox::clear_supercollider_fx));
 }
 
 RoutePropertiesBox::~RoutePropertiesBox ()
@@ -620,4 +631,37 @@ RoutePropertiesBox::open_supercollider_fx_editor ()
 	}
 
 	editor->open ();
+}
+
+void
+RoutePropertiesBox::reapply_supercollider_fx ()
+{
+	if (!_route || !_route->supports_supercollider_fx ()) {
+		return;
+	}
+
+	_route->reapply_supercollider_fx ();
+	sync_supercollider_fx_access ();
+}
+
+void
+RoutePropertiesBox::restart_supercollider_fx ()
+{
+	if (!_route || !_route->supports_supercollider_fx ()) {
+		return;
+	}
+
+	_route->restart_supercollider_fx ();
+	sync_supercollider_fx_access ();
+}
+
+void
+RoutePropertiesBox::clear_supercollider_fx ()
+{
+	if (!_route || !_route->supports_supercollider_fx ()) {
+		return;
+	}
+
+	_route->clear_supercollider_fx ();
+	sync_supercollider_fx_access ();
 }

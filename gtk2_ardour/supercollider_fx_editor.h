@@ -42,6 +42,9 @@ private:
 	void mark_dirty ();
 	void source_or_autofill_changed ();
 	void apply_changes ();
+	void reapply_fx ();
+	void restart_fx ();
+	void clear_stuck_fx ();
 	void load_source_from_file ();
 	void save_source_to_file ();
 
@@ -50,12 +53,16 @@ private:
 	Gtk::Label _detail_label;
 	Gtk::Label _diagnostics_label;
 	Gtk::HBox _controls_box;
+	Gtk::HBox _recovery_box;
 	Gtk::HBox _file_box;
 	Gtk::Label _synthdef_label;
 	Gtk::Entry _synthdef_entry;
 	Gtk::CheckButton _enable_button;
 	Gtk::CheckButton _auto_synthdef_button;
 	Gtk::Button _apply_button;
+	Gtk::Button _reapply_button;
+	Gtk::Button _restart_button;
+	Gtk::Button _clear_button;
 	Gtk::Button _load_button;
 	Gtk::Button _save_button;
 	Gtk::ScrolledWindow _source_scroller;

@@ -3352,6 +3352,84 @@ Route::refresh_supercollider_fx ()
 	return true;
 }
 
+bool
+Route::reapply_supercollider_fx ()
+{
+	if (!_supercollider_fx_enabled) {
+		set_supercollider_fx_status (_("disabled"), _("Enable SuperCollider FX before reapplying it."));
+		return false;
+	}
+
+	set_supercollider_fx_status (_("reapplying"), string_compose (_("Reapplying SynthDef %1 on %2."), _supercollider_fx_synthdef, name ()));
+	return refresh_supercollider_fx ();
+}
+
+bool
+Route::restart_supercollider_fx ()
+{
+	if (!supports_supercollider_fx ()) {
+		set_supercollider_fx_status (_("unsupported"), _("This route does not expose audio outputs for SuperCollider FX."), "", true);
+		return false;
+	}
+
+	std::shared_ptr<Route> const self = std::dynamic_pointer_cast<Route> (shared_from_this ());
+	if (!self) {
+		set_supercollider_fx_status (_("route unavailable"), _("No route was available while restarting the SuperCollider effect."), "", true);
+		return false;
+	}
+
+	std::shared_ptr<PluginInsert> sc_insert = _session.find_supercollider_insert (self);
+	if (sc_insert && sc_insert->plugin ()) {
+		std::shared_ptr<AUPlugin> au = std::dynamic_pointer_cast<AUPlugin> (sc_insert->plugin ());
+		if (au) {
+			au->set_supercollider_synthdef ("");
+		}
+	}
+
+	if (!_supercollider_fx_enabled) {
+		set_supercollider_fx_status (_("cleared"), _("The live SuperCollider FX node was cleared."));
+		return true;
+	}
+
+	set_supercollider_fx_status (_("restarting"), string_compose (_("Restarting SynthDef %1 on %2."), _supercollider_fx_synthdef, name ()));
+	return refresh_supercollider_fx ();
+}
+
+bool
+Route::clear_supercollider_fx ()
+{
+	if (!supports_supercollider_fx ()) {
+		set_supercollider_fx_status (_("unsupported"), _("This route does not expose audio outputs for SuperCollider FX."), "", true);
+		return false;
+	}
+
+	std::shared_ptr<Route> const self = std::dynamic_pointer_cast<Route> (shared_from_this ());
+	if (!self) {
+		set_supercollider_fx_status (_("route unavailable"), _("No route was available while clearing the SuperCollider effect."), "", true);
+		return false;
+	}
+
+	std::shared_ptr<PluginInsert> sc_insert = _session.find_supercollider_insert (self);
+	if (!sc_insert || !sc_insert->plugin ()) {
+		set_supercollider_fx_status (_("insert missing"), _("SuperCollider effect insert was not found on this route."), "", true);
+		return false;
+	}
+
+	std::shared_ptr<AUPlugin> au = std::dynamic_pointer_cast<AUPlugin> (sc_insert->plugin ());
+	if (!au) {
+		set_supercollider_fx_status (_("wrong plugin type"), _("SuperCollider effect insert is not an AudioUnit."), "", true);
+		return false;
+	}
+
+	if (!au->set_supercollider_synthdef ("")) {
+		set_supercollider_fx_status (_("clear failed"), _("Could not clear the live SuperCollider FX node on this route."), "", true);
+		return false;
+	}
+
+	set_supercollider_fx_status (_("cleared"), _("Cleared the live SuperCollider FX node. Use Reapply FX or Restart FX to bring it back."));
+	return true;
+}
+
 std::string
 Route::infer_supercollider_synthdef (std::string const& source)
 {

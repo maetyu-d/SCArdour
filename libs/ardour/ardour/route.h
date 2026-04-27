@@ -163,6 +163,9 @@ public:
 	void set_supercollider_fx_auto_synthdef (bool yn);
 	bool supercollider_fx_auto_synthdef () const { return _supercollider_fx_auto_synthdef; }
 	bool refresh_supercollider_fx ();
+	bool reapply_supercollider_fx ();
+	bool restart_supercollider_fx ();
+	bool clear_supercollider_fx ();
 	std::string const& supercollider_fx_last_error () const { return _supercollider_fx_last_error; }
 	std::string const& supercollider_fx_status_summary () const { return _supercollider_fx_status_summary; }
 	std::string const& supercollider_fx_status_detail () const { return _supercollider_fx_status_detail; }
