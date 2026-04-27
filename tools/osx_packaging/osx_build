@@ -236,6 +236,31 @@ sed -e "s?@APPNAME@?$appname?" \
 cp Info.plist $APPROOT
 cp -R Resources $APPROOT
 
+SC_COMPONENT_SOURCE=""
+if test -n "$SCARDOUR_SUPERCOLLIDER_AU_COMPONENT" -a -d "$SCARDOUR_SUPERCOLLIDER_AU_COMPONENT"; then
+	SC_COMPONENT_SOURCE="$SCARDOUR_SUPERCOLLIDER_AU_COMPONENT"
+else
+	for candidate in \
+		"/tmp/scardourproj/extern/SuperColliderAU/build-nospace/SuperColliderAU.component" \
+		"../../../SuperColliderAU/build-nospace/SuperColliderAU.component" \
+		"../../../artifacts/SuperColliderAU.component" \
+		"$HOME/Library/Audio/Plug-Ins/Components/SuperColliderAU.component"
+	do
+		if test -d "$candidate"; then
+			SC_COMPONENT_SOURCE="$candidate"
+			break
+		fi
+	done
+fi
+
+if test -n "$SC_COMPONENT_SOURCE"; then
+	echo "Bundling SuperColliderAU component from $SC_COMPONENT_SOURCE"
+	rm -rf "$Resources/SuperColliderAU.component"
+	cp -R "$SC_COMPONENT_SOURCE" "$Resources/SuperColliderAU.component"
+else
+	echo "WARNING: SuperColliderAU.component was not found, bundle install helper will be unavailable"
+fi
+
 # ..and clean up
 rm -f Info.plist
 rm -f Resources/InfoPlist.strings

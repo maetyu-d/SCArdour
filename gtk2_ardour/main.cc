@@ -31,6 +31,7 @@
 
 #include <signal.h>
 #include <locale.h>
+#include <glib/gstdio.h>
 
 #include <sigc++/bind.h>
 #include <ytkmm/settings.h>
@@ -83,6 +84,11 @@
 #include <ydk/gdkx.h>
 #endif
 
+#ifdef __APPLE__
+#include <mach-o/dyld.h>
+#include <sys/param.h>
+#endif
+
 using namespace std;
 using namespace Gtk;
 using namespace ARDOUR_COMMAND_LINE;
@@ -95,6 +101,61 @@ extern int curvetest (string);
 
 static ARDOUR_UI  *ui = 0;
 static string localedir (LOCALEDIR);
+
+#ifdef __APPLE__
+static void
+install_bundled_supercollider_component ()
+{
+	if (!g_getenv ("ARDOUR_BUNDLED")) {
+		return;
+	}
+
+	char execpath[MAXPATHLEN + 1];
+	uint32_t pathsz = sizeof (execpath);
+
+	if (_NSGetExecutablePath (execpath, &pathsz) != 0) {
+		return;
+	}
+
+	std::string const exec_dir = Glib::path_get_dirname (execpath);
+	std::string const bundle_dir = Glib::path_get_dirname (exec_dir);
+	std::string const bundled_component = Glib::build_filename (bundle_dir, "Resources", "SuperColliderAU.component");
+	std::string const bundled_info = Glib::build_filename (bundled_component, "Contents", "Info.plist");
+	std::string const user_component = Glib::build_filename (Glib::get_home_dir (), "Library", "Audio", "Plug-Ins", "Components", "SuperColliderAU.component");
+	std::string const user_info = Glib::build_filename (user_component, "Contents", "Info.plist");
+
+	if (!Glib::file_test (bundled_info, Glib::FILE_TEST_EXISTS)) {
+		return;
+	}
+
+	bool should_install = !Glib::file_test (user_info, Glib::FILE_TEST_EXISTS);
+
+	if (!should_install) {
+		GStatBuf bundled_stat;
+		GStatBuf user_stat;
+
+		if (g_stat (bundled_info.c_str (), &bundled_stat) == 0 && g_stat (user_info.c_str (), &user_stat) == 0) {
+			should_install = bundled_stat.st_mtime > user_stat.st_mtime;
+		}
+	}
+
+	if (!should_install) {
+		return;
+	}
+
+	std::string const component_parent = Glib::path_get_dirname (user_component);
+	if (g_mkdir_with_parents (component_parent.c_str (), 0755) != 0) {
+		cerr << "Unable to create Audio Unit component directory: " << component_parent << endl;
+		return;
+	}
+
+	if (Glib::file_test (user_component, Glib::FILE_TEST_EXISTS)) {
+		PBD::remove_directory (user_component);
+	}
+
+	PBD::copy_recurse (bundled_component, user_component, true);
+}
+#endif
 
 void
 gui_jack_error ()
@@ -258,6 +319,10 @@ int main (int argc, char *argv[])
 	}
 
 	fixup_bundle_environment (argc, argv, localedir);
+
+#ifdef __APPLE__
+	install_bundled_supercollider_component ();
+#endif
 
 	load_custom_fonts(); /* needs to happen before any gtk and pango init calls */
 
