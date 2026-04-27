@@ -1,3 +1,5 @@
+# SCArdour
+
 SCArdour is a close/tight integration of the open source SuperCollider audio synthesis and algorithmic composition envrironment into the open source Ardour DAW software.
 
 Please see the Ardour website at https://ardour.org/ for all Ardour documentation.
